@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "stitch": {
+      "command": "node",
+      "args": ["/home/scrungus/viDAO/stitch-mcp-server.mjs"],
+      "env": {
+        "STITCH_API_KEY": "AQ.Ab8RN6JbiRmy3nfjq60LcWYmFuCx4iZASQ_VYDu6Ily_gcApyQ"
+      }
+    }
+  }
+}
