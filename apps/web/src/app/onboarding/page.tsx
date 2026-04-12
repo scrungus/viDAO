@@ -3,22 +3,62 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   usePrivy,
-  useMfaEnrollment,
+  useLinkWithPasskey,
   getAccessToken,
   type PasskeyWithMetadata,
+  type User,
 } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 
 type Step = "login" | "passkey" | "complete";
 
 export default function OnboardingPage() {
-  const { ready, authenticated, login, user } = usePrivy();
-  const { initEnrollmentWithPasskey, submitEnrollmentWithPasskey } =
-    useMfaEnrollment();
+  const { ready, authenticated, login } = usePrivy();
   const router = useRouter();
   const [step, setStep] = useState<Step>("login");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const finishRegistration = useCallback(
+    async (credentialId: string | undefined) => {
+      const accessToken = await getAccessToken();
+      await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({
+          attestationType: credentialId ? "HARDWARE" : "SOFTWARE",
+          ...(credentialId && { webauthnCredentialId: credentialId }),
+        }),
+      });
+      setStep("complete");
+      setTimeout(() => router.push("/"), 1500);
+    },
+    [router],
+  );
+
+  const { linkWithPasskey } = useLinkWithPasskey({
+    onSuccess: async ({ user }: { user: User }) => {
+      const passkeys = (user.linkedAccounts ?? []).filter(
+        (account): account is PasskeyWithMetadata =>
+          account.type === "passkey",
+      );
+      const latestCredentialId = passkeys[passkeys.length - 1]?.credentialId;
+      try {
+        await finishRegistration(latestCredentialId);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Registration failed");
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: (err) => {
+      setError(err || "Passkey enrollment failed");
+      setLoading(false);
+    },
+  });
 
   // After Privy login completes, move to passkey step
   useEffect(() => {
@@ -32,47 +72,11 @@ export default function OnboardingPage() {
     login();
   }, [login]);
 
-  const handlePasskeyEnrollment = useCallback(async () => {
+  const handlePasskeyEnrollment = useCallback(() => {
     setError(null);
     setLoading(true);
-    try {
-      await initEnrollmentWithPasskey();
-
-      // Get credential IDs from linked passkey accounts
-      const credentialIds = (user?.linkedAccounts ?? [])
-        .filter(
-          (account): account is PasskeyWithMetadata =>
-            account.type === "passkey",
-        )
-        .map((x) => x.credentialId);
-
-      await submitEnrollmentWithPasskey({ credentialIds });
-
-      // Sync user to our database
-      const accessToken = await getAccessToken();
-      await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        body: JSON.stringify({
-          attestationType: "HARDWARE",
-          webauthnCredentialId: credentialIds[0],
-        }),
-      });
-
-      setStep("complete");
-      // Redirect to homepage after brief delay
-      setTimeout(() => router.push("/"), 1500);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Passkey enrollment failed";
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [initEnrollmentWithPasskey, submitEnrollmentWithPasskey, user, router]);
+    linkWithPasskey();
+  }, [linkWithPasskey]);
 
   const handleSkipPasskey = useCallback(async () => {
     setLoading(true);

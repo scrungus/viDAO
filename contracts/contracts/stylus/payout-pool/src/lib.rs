@@ -32,7 +32,6 @@ sol_storage! {
     pub struct PayoutPool {
         address owner;
         address usdc_token;
-        uint256 pool_balance;
         bool initialized;
     }
 }
@@ -64,6 +63,10 @@ impl PayoutPool {
 
     /// Deposit USDC into the payout pool.
     /// Caller must have approved this contract to spend `amount` USDC.
+    ///
+    /// Note: depositing via this entrypoint is optional — funds sent directly
+    /// to the contract via `transfer`/`transferFrom` are equally counted,
+    /// since `pool_balance()` reads live from the ERC20.
     pub fn deposit(&mut self, amount: U256) -> Result<(), Vec<u8>> {
         if !self.initialized.get() {
             return Err(NotInitialized {}.abi_encode());
@@ -83,14 +86,12 @@ impl PayoutPool {
             return Err(TransferFailed {}.abi_encode());
         }
 
-        let current = self.pool_balance.get();
-        self.pool_balance.set(current + amount);
         Ok(())
     }
 
     /// Distribute USDC from the pool to creators. Owner only.
     /// `creators` and `amounts` must be the same length.
-    /// Sum of `amounts` must not exceed `pool_balance`.
+    /// Sum of `amounts` must not exceed the contract's live USDC balance.
     pub fn distribute(
         &mut self,
         creators: Vec<Address>,
@@ -106,13 +107,20 @@ impl PayoutPool {
             return Err(LengthMismatch {}.abi_encode());
         }
 
-        // Calculate total and validate against pool balance
+        // Calculate total and validate against live pool balance
         let mut total = U256::ZERO;
         for amount in &amounts {
             total = total + *amount;
         }
 
-        let pool = self.pool_balance.get();
+        let usdc_addr = self.usdc_token.get();
+        let usdc = IERC20::new(usdc_addr);
+        let this = self.vm().contract_address();
+
+        let pool = {
+            let ctx = Call::new();
+            usdc.balance_of(self.vm(), ctx, this)?
+        };
         if total > pool {
             return Err(InsufficientPool {
                 requested: total,
@@ -122,9 +130,6 @@ impl PayoutPool {
         }
 
         // Transfer to each creator
-        let usdc_addr = self.usdc_token.get();
-        let usdc = IERC20::new(usdc_addr);
-
         for i in 0..creators.len() {
             if amounts[i] > U256::ZERO {
                 let ctx = Call::new_mutating(self);
@@ -135,13 +140,15 @@ impl PayoutPool {
             }
         }
 
-        self.pool_balance.set(pool - total);
         Ok(())
     }
 
-    /// Returns the current pool balance.
-    pub fn pool_balance(&self) -> U256 {
-        self.pool_balance.get()
+    /// Returns the current pool balance, read live from the USDC contract.
+    pub fn pool_balance(&self) -> Result<U256, Vec<u8>> {
+        let usdc = IERC20::new(self.usdc_token.get());
+        let this = self.vm().contract_address();
+        let ctx = Call::new();
+        Ok(usdc.balance_of(self.vm(), ctx, this)?)
     }
 
     /// Returns the owner address.
