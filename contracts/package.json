@@ -1,0 +1,19 @@
+{
+  "name": "vidao-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compile": "npx hardhat arb:compile",
+    "test": "npx hardhat arb:test",
+    "node:start": "npx hardhat arb:node start",
+    "node:stop": "npx hardhat arb:node stop",
+    "node:status": "npx hardhat arb:node status",
+    "deploy": "npx hardhat arb:deploy"
+  },
+  "devDependencies": {
+    "hardhat": "^3.3.0",
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.0",
+    "@cobuilders/hardhat-arbitrum-stylus": "^0.0.1-alpha.21"
+  }
+}

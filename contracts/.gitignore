@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Hardhat
+cache/
+artifacts/
+typechain-types/
+
+# Rust / Stylus build output
+target/
+
+# Env
+.env
+.env.*
+!.env.example
