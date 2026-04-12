@@ -1,4 +1,4 @@
-# StreamDAO — Project Plan
+# viDAO — Project Plan
 
 ## Overview
 

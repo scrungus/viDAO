@@ -3,10 +3,10 @@ title: "Subscription Webhook — POST /api/subscription/webhook"
 description: "Transak calls this endpoint when a subscription payment completes. Verifies the JWT payload and activates a 30-day subscription for the paying wallet address."
 ---
 
-The subscription webhook is called by [Transak](https://transak.com) — not by your application code directly. When a user completes a fiat-to-USDC subscription purchase through the Transak widget, Transak sends an `ORDER_COMPLETED` event to this endpoint. StreamDAO verifies the JWT payload and activates a 30-day subscription for the wallet address associated with the order.
+The subscription webhook is called by [Transak](https://transak.com) — not by your application code directly. When a user completes a fiat-to-USDC subscription purchase through the Transak widget, Transak sends an `ORDER_COMPLETED` event to this endpoint. viDAO verifies the JWT payload and activates a 30-day subscription for the wallet address associated with the order.
 
 <Note>
-  If you are integrating StreamDAO and need to configure Transak, set the webhook URL in your Transak dashboard to `https://your-streamdao-instance.com/api/subscription/webhook`. This endpoint is not intended to be called by user-facing clients.
+  If you are integrating viDAO and need to configure Transak, set the webhook URL in your Transak dashboard to `https://your-viDAO-instance.com/api/subscription/webhook`. This endpoint is not intended to be called by user-facing clients.
 </Note>
 
 ## Request
@@ -16,7 +16,7 @@ POST /api/subscription/webhook
 Content-Type: application/json
 ```
 
-No session cookie is required. The payload is authenticated via JWT signature using the shared secret configured between Transak and your StreamDAO deployment.
+No session cookie is required. The payload is authenticated via JWT signature using the shared secret configured between Transak and your viDAO deployment.
 
 <ParamField body="data" type="string" required>
   A JWT-encoded string containing the order payload. The JWT is signed with your `TRANSAK_ACCESS_TOKEN`. The server decodes and verifies this token before processing any order data.
@@ -32,10 +32,10 @@ After verifying the JWT signature, the server reads the following fields from th
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `walletAddress` | `string` | The user's wallet address. Used to look up the StreamDAO user record. |
+| `walletAddress` | `string` | The user's wallet address. Used to look up the viDAO user record. |
 | `id` | `string` | The Transak order ID. Logged for debugging. |
 
-The full Transak order object may contain additional fields. StreamDAO only reads `walletAddress` and `id`.
+The full Transak order object may contain additional fields. viDAO only reads `walletAddress` and `id`.
 
 ### Decoded JWT example
 
@@ -64,7 +64,7 @@ The full Transak order object may contain additional fields. StreamDAO only read
 | Any other value | Returns `200 { "ok": true }` with no state change. |
 
 <Warning>
-  If no StreamDAO user record is found for the `walletAddress` in an `ORDER_COMPLETED` event, the webhook returns `200` with no subscription activated. Ensure users complete the registration flow (including wallet association via Privy) before initiating a Transak payment.
+  If no viDAO user record is found for the `walletAddress` in an `ORDER_COMPLETED` event, the webhook returns `200` with no subscription activated. Ensure users complete the registration flow (including wallet association via Privy) before initiating a Transak payment.
 </Warning>
 
 ## Response
@@ -94,4 +94,4 @@ This is the raw JSON body Transak sends to the endpoint:
 
 ## On-chain note
 
-The webhook activates the subscription in the StreamDAO database. USDC from the payment is deposited into the PayoutPool contract separately — Transak sends USDC directly to the pool wallet, and the payout cron handles the smart contract `deposit()` call. See the [PayoutPool Contract](/api/payout-pool-contract) reference for details on how pool deposits work.
+The webhook activates the subscription in the viDAO database. USDC from the payment is deposited into the PayoutPool contract separately — Transak sends USDC directly to the pool wallet, and the payout cron handles the smart contract `deposit()` call. See the [PayoutPool Contract](/api/payout-pool-contract) reference for details on how pool deposits work.

@@ -1,15 +1,15 @@
 ---
-title: "Authenticating Requests with the StreamDAO API"
-description: "StreamDAO API requests are authenticated via Privy session cookies. Learn how to register after login and what errors to expect when unauthenticated."
+title: "Authenticating Requests with the viDAO API"
+description: "viDAO API requests are authenticated via Privy session cookies. Learn how to register after login and what errors to expect when unauthenticated."
 ---
 
-StreamDAO uses [Privy](https://privy.io) for identity. When a user completes the sign-in flow in the web application, Privy issues a session cookie that is automatically attached to subsequent same-origin requests. The API reads that cookie server-side — there are no bearer tokens or API keys to manage.
+viDAO uses [Privy](https://privy.io) for identity. When a user completes the sign-in flow in the web application, Privy issues a session cookie that is automatically attached to subsequent same-origin requests. The API reads that cookie server-side — there are no bearer tokens or API keys to manage.
 
 If you are building a server-side integration or a custom client that sends requests directly, you must first authenticate through the Privy web flow to obtain a valid session cookie, then include it with each request.
 
 ## Registering after login
 
-After a successful Privy login, your client should call `POST /api/auth/register`. This endpoint creates the user record in the StreamDAO database (or updates it if the user already exists). It also accepts an optional WebAuthn credential, which is required for hardware-attested watch time to accumulate.
+After a successful Privy login, your client should call `POST /api/auth/register`. This endpoint creates the user record in the viDAO database (or updates it if the user already exists). It also accepts an optional WebAuthn credential, which is required for hardware-attested watch time to accumulate.
 
 <Note>
   This endpoint must be called after every Privy login to keep the database record in sync with the Privy identity, especially when updating a WebAuthn credential.
@@ -35,7 +35,7 @@ The request body is optional. Omit it entirely if you are registering without a 
 ### Response
 
 <ResponseField name="userId" type="string">
-  The internal StreamDAO user ID (UUID).
+  The internal viDAO user ID (UUID).
 </ResponseField>
 
 <ResponseField name="role" type='"VIEWER" | "CREATOR"'>
@@ -46,7 +46,7 @@ The request body is optional. Omit it entirely if you are registering without a 
 
 <CodeGroup>
 ```bash cURL
-curl -X POST https://your-streamdao-instance.com/api/auth/register \
+curl -X POST https://your-viDAO-instance.com/api/auth/register \
   -H "Content-Type: application/json" \
   --cookie "privy-session=<your-session-cookie>" \
   -d '{

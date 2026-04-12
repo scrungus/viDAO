@@ -8,7 +8,7 @@ PayoutPool is a Rust smart contract compiled to WASM via the [Arbitrum Stylus](h
 The contract exposes three mutating functions and three view functions, all callable through the standard EVM ABI. You can interact with it using ethers.js, viem, wagmi, or any EVM-compatible tool.
 
 <Note>
-  The `distribute()` function is restricted to the contract owner and is called automatically by the StreamDAO payout cron. You do not need to call it directly. The functions most relevant to external integrations are `deposit()` and the three view functions.
+  The `distribute()` function is restricted to the contract owner and is called automatically by the viDAO payout cron. You do not need to call it directly. The functions most relevant to external integrations are `deposit()` and the three view functions.
 </Note>
 
 ## ABI
@@ -251,4 +251,4 @@ console.log('Deposit confirmed:', depositHash);
 
 The contract is written in Rust and compiled to WASM using the `stylus-sdk` crate. It conforms to the standard EVM ABI, so any tool that can interact with Ethereum smart contracts can interact with PayoutPool — no Stylus-specific tooling is required on the client side.
 
-The `distribute()` function is called automatically by the StreamDAO weekly payout job. It computes each creator's proportional share of the pool from verified watch hours and submits a single transaction with all creator addresses and amounts. The transaction hash is surfaced in each creator's dashboard for on-chain verification.
+The `distribute()` function is called automatically by the viDAO weekly payout job. It computes each creator's proportional share of the pool from verified watch hours and submits a single transaction with all creator addresses and amounts. The transaction hash is surfaced in each creator's dashboard for on-chain verification.

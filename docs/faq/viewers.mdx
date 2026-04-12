@@ -1,31 +1,31 @@
 ---
 title: "Viewer FAQ: Subscriptions, Devices, and Privacy"
-description: "Answers to common viewer questions about how StreamDAO subscriptions work, device verification, biometric data, and supporting your favourite creators."
+description: "Answers to common viewer questions about how viDAO subscriptions work, device verification, biometric data, and supporting your favourite creators."
 ---
 
-StreamDAO is built to feel like any other streaming service — subscribe, watch, enjoy. But under the hood, your viewing activity directly determines how much creators earn, and a few technical choices make that possible. Here are answers to the questions viewers ask most.
+viDAO is built to feel like any other streaming service — subscribe, watch, enjoy. But under the hood, your viewing activity directly determines how much creators earn, and a few technical choices make that possible. Here are answers to the questions viewers ask most.
 
 <AccordionGroup>
   <Accordion title="Do I need a crypto wallet to subscribe?">
     No. You sign up with an email address and a standard card payment — no wallet app, no seed phrases, no crypto knowledge required.
 
-    Behind the scenes, StreamDAO creates a wallet for you automatically during sign-up. This wallet handles the USDC conversion from your subscription fee and ties your viewing activity to the creator payout system. You never see it, manage it, or need to think about it. It works the same way a payment token works on a regular streaming service — silently, in the background.
+    Behind the scenes, viDAO creates a wallet for you automatically during sign-up. This wallet handles the USDC conversion from your subscription fee and ties your viewing activity to the creator payout system. You never see it, manage it, or need to think about it. It works the same way a payment token works on a regular streaming service — silently, in the background.
   </Accordion>
 
   <Accordion title="What happens if my device doesn't support hardware attestation?">
-    You can still watch all content on StreamDAO. Hardware attestation is not a requirement for viewing — it's a requirement for your watch hours to count toward creator payouts.
+    You can still watch all content on viDAO. Hardware attestation is not a requirement for viewing — it's a requirement for your watch hours to count toward creator payouts.
 
     If your device doesn't have a supported secure hardware chip (such as an older device without a Secure Enclave or TPM), your viewing hours won't contribute to the creator payout calculation. The creator you're watching won't earn from your sessions, but your experience as a viewer is otherwise unchanged.
 
     Hardware attestation is supported on the vast majority of modern devices — iPhones from 2013 onwards, Android phones running Android 9 or later, Windows PCs with TPM 2.0 (standard since 2016), and Macs with T2 chip or Apple Silicon.
   </Accordion>
 
-  <Accordion title="Is my biometric data (fingerprint, Face ID) sent to StreamDAO?">
+  <Accordion title="Is my biometric data (fingerprint, Face ID) sent to viDAO?">
     No. Your biometric data never leaves your device.
 
-    When you register, your device uses your fingerprint or Face ID to unlock a private key stored inside its secure hardware chip — the same chip that protects your phone's payment credentials. That private key signs a small piece of data to prove your device is present. StreamDAO only ever receives that cryptographic signature — never your biometric itself.
+    When you register, your device uses your fingerprint or Face ID to unlock a private key stored inside its secure hardware chip — the same chip that protects your phone's payment credentials. That private key signs a small piece of data to prove your device is present. viDAO only ever receives that cryptographic signature — never your biometric itself.
 
-    This is how WebAuthn (the underlying standard) was designed to work. Your biometric data is processed entirely by your device's hardware and operating system. No image, template, or biometric representation is transmitted to or stored by StreamDAO.
+    This is how WebAuthn (the underlying standard) was designed to work. Your biometric data is processed entirely by your device's hardware and operating system. No image, template, or biometric representation is transmitted to or stored by viDAO.
   </Accordion>
 
   <Accordion title="Why is there a 50-hour monthly cap on counted watch hours?">
@@ -37,7 +37,7 @@ StreamDAO is built to feel like any other streaming service — subscribe, watch
   </Accordion>
 
   <Accordion title="Can I watch on multiple devices?">
-    Yes. You can watch StreamDAO on as many devices as you like, as long as each device completes its own hardware attestation during setup.
+    Yes. You can watch viDAO on as many devices as you like, as long as each device completes its own hardware attestation during setup.
 
     Watch hours accumulate independently per device, and the 50-hour monthly cap applies across your entire account — not per device. So if you watch 30 hours on your phone and 25 hours on your laptop, your total verified hours for the month would be 50 (capped), even though the combined total across devices was 55.
 
@@ -47,6 +47,6 @@ StreamDAO is built to feel like any other streaming service — subscribe, watch
   <Accordion title="How do I cancel my subscription?">
     You can cancel your subscription at any time from your account settings. Navigate to **Account → Subscription** and select **Cancel subscription**.
 
-    Your access continues until the end of your current billing period. StreamDAO does not offer partial-month refunds, but you won't be charged again after cancelling. If you resubscribe later, your device attestation carries over — you won't need to re-register your devices.
+    Your access continues until the end of your current billing period. viDAO does not offer partial-month refunds, but you won't be charged again after cancelling. If you resubscribe later, your device attestation carries over — you won't need to re-register your devices.
   </Accordion>
 </AccordionGroup>

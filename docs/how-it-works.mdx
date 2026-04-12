@@ -1,9 +1,9 @@
 ---
-title: "How StreamDAO's Subscription and Payout Model Works"
+title: "How viDAO's Subscription and Payout Model Works"
 description: "Follow the money: how your monthly subscription becomes creator earnings — from card payment to verified watch hours to weekly USDC payouts, step by step."
 ---
 
-StreamDAO's economic model is straightforward: subscribers pay in, creators earn out, in proportion to how much time viewers genuinely spend watching their content. The platform's job is to make that flow trustworthy and tamper-resistant. This page explains each step of that journey — from the moment you subscribe to the moment a creator receives their weekly payout.
+viDAO's economic model is straightforward: subscribers pay in, creators earn out, in proportion to how much time viewers genuinely spend watching their content. The platform's job is to make that flow trustworthy and tamper-resistant. This page explains each step of that journey — from the moment you subscribe to the moment a creator receives their weekly payout.
 
 ## The full flow
 
@@ -14,14 +14,14 @@ StreamDAO's economic model is straightforward: subscribers pay in, creators earn
     After the 5% protocol fee (which covers infrastructure costs), the remaining 95% of every subscriber's fee sits in the pool waiting to be distributed to creators at the end of the week.
 
     <Info>
-      The pool is held in a smart contract — a self-executing piece of code on the Arbitrum blockchain. No single person, including StreamDAO, can move those funds arbitrarily. The contract releases money only when the weekly distribution rules are met.
+      The pool is held in a smart contract — a self-executing piece of code on the Arbitrum blockchain. No single person, including viDAO, can move those funds arbitrarily. The contract releases money only when the weekly distribution rules are met.
     </Info>
   </Step>
 
   <Step title="Your device is verified once, at sign-up">
     When you create your account, your browser asks for a fingerprint, Face ID, or PIN. This is a standard security step called WebAuthn — the same technology used by banking apps and password managers.
 
-    Your device uses this to generate a unique security key inside a protected chip — called the Secure Enclave on Apple devices, StrongBox on Android, and TPM on Windows PCs. The private part of that key never leaves the chip. This matters because it means your device can prove to StreamDAO's servers that it is a genuine physical device — not a bot, a virtual machine, or a script running in the cloud.
+    Your device uses this to generate a unique security key inside a protected chip — called the Secure Enclave on Apple devices, StrongBox on Android, and TPM on Windows PCs. The private part of that key never leaves the chip. This matters because it means your device can prove to viDAO's servers that it is a genuine physical device — not a bot, a virtual machine, or a script running in the cloud.
 
     <Note>
       This happens once per device. You won't be asked again while watching. Most modern devices support this — iPhones from 2013 onwards, Android phones from 2018 onwards, and Windows 10 PCs with TPM 2.0 (which has been standard since 2016).
@@ -29,7 +29,7 @@ StreamDAO's economic model is straightforward: subscribers pay in, creators earn
   </Step>
 
   <Step title="Heartbeats verify your watch time during playback">
-    While you're watching, the video player quietly sends a small signal to StreamDAO's servers every 30 seconds. This signal — called a heartbeat — is automatically signed by your device's security chip. It's invisible to you; playback continues normally.
+    While you're watching, the video player quietly sends a small signal to viDAO's servers every 30 seconds. This signal — called a heartbeat — is automatically signed by your device's security chip. It's invisible to you; playback continues normally.
 
     Each heartbeat tells the server: "This specific, verified physical device is actively watching right now." The server checks the signature, confirms your subscription is active, and adds 30 seconds to your tally of verified watch hours.
 
@@ -51,7 +51,7 @@ StreamDAO's economic model is straightforward: subscribers pay in, creators earn
   </Step>
 
   <Step title="Creators receive their share each week">
-    Every week, StreamDAO tallies all the verified watch hours from all subscribers across all creators. Each creator's share of the pool is proportional to the fraction of total watch hours their content received.
+    Every week, viDAO tallies all the verified watch hours from all subscribers across all creators. Each creator's share of the pool is proportional to the fraction of total watch hours their content received.
 
     If all creators' content generated 10,000 verified watch hours in a week, and one creator's videos accounted for 1,000 of those hours, that creator receives 10% of the pool for that period — automatically, in USDC, to their wallet.
 
@@ -61,7 +61,7 @@ StreamDAO's economic model is straightforward: subscribers pay in, creators earn
 
 ## Why hardware attestation stops gaming
 
-The biggest risk to a system like this is fake engagement — bots or device farms watching content to inflate a creator's share. StreamDAO's defence against this is hardware attestation.
+The biggest risk to a system like this is fake engagement — bots or device farms watching content to inflate a creator's share. viDAO's defence against this is hardware attestation.
 
 <CardGroup cols={2}>
   <Card title="Virtual machines and bots are blocked outright" icon="robot">
@@ -79,7 +79,7 @@ The biggest risk to a system like this is fake engagement — bots or device far
 </CardGroup>
 
 <Warning>
-  Devices that don't support hardware attestation — very old phones or some older laptops — can still watch all content on StreamDAO. However, their watch time does not contribute to the pool distribution. Only hardware-attested sessions count toward creator payouts.
+  Devices that don't support hardware attestation — very old phones or some older laptops — can still watch all content on viDAO. However, their watch time does not contribute to the pool distribution. Only hardware-attested sessions count toward creator payouts.
 </Warning>
 
 ## What the pool looks like in practice
@@ -96,7 +96,7 @@ The numbers above are illustrative. The actual pool size depends on how many sub
 
 ## A note on transparency
 
-StreamDAO publishes the engagement scoring logic as open source code. The exact version of that code used to calculate each weekly payout is recorded publicly alongside the distribution. Creators can audit the formula used to calculate their share and verify their own numbers are correct.
+viDAO publishes the engagement scoring logic as open source code. The exact version of that code used to calculate each weekly payout is recorded publicly alongside the distribution. Creators can audit the formula used to calculate their share and verify their own numbers are correct.
 
 <Note>
   Full verifiable payouts — including on-chain merkle proofs that let creators independently confirm their earnings — are coming in a future release. The current MVP calculates and distributes payouts automatically without the additional cryptographic verification layer.

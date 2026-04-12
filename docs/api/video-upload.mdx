@@ -1,9 +1,9 @@
 ---
 title: "Upload Videos as a Creator — POST /api/videos/upload"
-description: "Publish video content as a StreamDAO creator. Accepts multipart/form-data up to 500 MB and auto-generates a thumbnail from the first second of footage."
+description: "Publish video content as a viDAO creator. Accepts multipart/form-data up to 500 MB and auto-generates a thumbnail from the first second of footage."
 ---
 
-The video upload endpoint allows users with the `CREATOR` role to publish video content to StreamDAO. You submit a multipart form with the video file, a required title, and an optional description. The server stores the video, runs ffmpeg to extract a thumbnail from the first second of footage, persists the video record, and returns the video ID and paths.
+The video upload endpoint allows users with the `CREATOR` role to publish video content to viDAO. You submit a multipart form with the video file, a required title, and an optional description. The server stores the video, runs ffmpeg to extract a thumbnail from the first second of footage, persists the video record, and returns the video ID and paths.
 
 <Note>
   Creator access is invite-only during the MVP. If `POST /api/auth/register` returns `"role": "VIEWER"`, you do not have upload access. Contact the platform operator to request creator status.
@@ -39,7 +39,7 @@ On success the endpoint returns `HTTP 200` with the newly created video record:
 </ResponseField>
 
 <ResponseField name="videoPath" type="string">
-  The server-relative path to the stored video file, e.g. `/videos/a3f8c2d1e4b5.mp4`. Resolve against your StreamDAO base URL to construct a playback URL.
+  The server-relative path to the stored video file, e.g. `/videos/a3f8c2d1e4b5.mp4`. Resolve against your viDAO base URL to construct a playback URL.
 </ResponseField>
 
 <ResponseField name="thumbnailUrl" type="string | null">
@@ -81,7 +81,7 @@ Error responses follow the standard shape:
 
 <CodeGroup>
 ```bash cURL
-curl -X POST https://your-streamdao-instance.com/api/videos/upload \
+curl -X POST https://your-viDAO-instance.com/api/videos/upload \
   --cookie "privy-session=<your-session-cookie>" \
   -F "file=@/path/to/video.mp4" \
   -F "title=My First Stream" \

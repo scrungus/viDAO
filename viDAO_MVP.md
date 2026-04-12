@@ -1,4 +1,4 @@
-# StreamDAO — MVP
+# viDAO — MVP
 
 ## Goal
 

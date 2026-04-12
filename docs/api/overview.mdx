@@ -1,17 +1,17 @@
 ---
-title: "StreamDAO API: Endpoints and Smart Contract Reference"
-description: "All public StreamDAO HTTP endpoints and the PayoutPool smart contract — auth model, base URL, response format, and the watch session lifecycle."
+title: "viDAO API: Endpoints and Smart Contract Reference"
+description: "All public viDAO HTTP endpoints and the PayoutPool smart contract — auth model, base URL, response format, and the watch session lifecycle."
 ---
 
-The StreamDAO API is a set of HTTP endpoints hosted alongside the Next.js web application. All routes live under `/api` and return JSON. Authentication is handled through session cookies issued after a Privy login — there are no API keys. For on-chain interactions, the **PayoutPool** Stylus contract on Arbitrum runs alongside the HTTP API as a separate integration point.
+The viDAO API is a set of HTTP endpoints hosted alongside the Next.js web application. All routes live under `/api` and return JSON. Authentication is handled through session cookies issued after a Privy login — there are no API keys. For on-chain interactions, the **PayoutPool** Stylus contract on Arbitrum runs alongside the HTTP API as a separate integration point.
 
 ## Base URL
 
 ```
-https://your-streamdao-instance.com/api
+https://your-viDAO-instance.com/api
 ```
 
-All paths below are relative to this base. The exact hostname depends on your deployment — StreamDAO is self-hosted.
+All paths below are relative to this base. The exact hostname depends on your deployment — viDAO is self-hosted.
 
 ## Authentication
 

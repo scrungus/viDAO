@@ -3,7 +3,7 @@ title: "Watch Heartbeat — POST /api/watch/heartbeat"
 description: "Report active playback every 30 seconds to accumulate verified watch time. Always returns HTTP 200 — requires hardware attestation and an active subscription."
 ---
 
-The heartbeat endpoint is the mechanism by which the StreamDAO player reports that a user is actively watching a video. Your client should call it every 30 seconds during playback. The endpoint is intentionally silent — it always returns `HTTP 200 { "ok": true }` regardless of whether the heartbeat was counted. This prevents the player from receiving information about subscription or attestation status mid-session.
+The heartbeat endpoint is the mechanism by which the viDAO player reports that a user is actively watching a video. Your client should call it every 30 seconds during playback. The endpoint is intentionally silent — it always returns `HTTP 200 { "ok": true }` regardless of whether the heartbeat was counted. This prevents the player from receiving information about subscription or attestation status mid-session.
 
 Before sending heartbeats, you must open a watch session with `POST /api/watch/start` and use the returned `sessionId` in every heartbeat call.
 
@@ -80,7 +80,7 @@ POST /api/watch/end     { sessionId }  →  { ok: true }
 
 <CodeGroup>
 ```bash cURL
-curl -X POST https://your-streamdao-instance.com/api/watch/heartbeat \
+curl -X POST https://your-viDAO-instance.com/api/watch/heartbeat \
   -H "Content-Type: application/json" \
   --cookie "privy-session=<your-session-cookie>" \
   -d '{"sessionId": "cm9xr3z9e20000o8kw3k9d5f1a"}'
