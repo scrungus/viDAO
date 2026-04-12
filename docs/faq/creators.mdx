@@ -1,0 +1,73 @@
+---
+title: "Creator FAQ: Payouts, Eligibility, and Verification"
+description: "Answers for StreamDAO creators on how to join, when you get paid, what counts as a verified watch hour, and how to understand your earnings."
+---
+
+As a StreamDAO creator, your earnings come directly from the platform's subscription pool — no ads, no algorithmic favouritism, no opaque revenue share. The more genuine, engaged watch time you earn, the larger your share of that month's pool. Here's what creators ask most.
+
+<AccordionGroup>
+  <Accordion title="How do I join StreamDAO as a creator?">
+    StreamDAO is invite-only for creators at launch. This lets the platform maintain content quality and ensure the economics work well for early creators before opening more broadly.
+
+    To express interest, fill out the creator application form linked from the StreamDAO homepage. The team reviews applications on a rolling basis and will reach out with an invite if your content is a good fit for the current catalogue.
+
+    Once invited, you'll connect your crypto wallet, upload your content via the creator dashboard, and set titles, descriptions, and thumbnails. No technical blockchain knowledge is needed — the dashboard handles everything.
+  </Accordion>
+
+  <Accordion title="When do I receive payouts, and in what form?">
+    Payouts run automatically every week. USDC (a US dollar-pegged stablecoin) is transferred directly to your connected wallet address as part of each weekly distribution.
+
+    You don't need to claim or request your payout — it arrives in your wallet automatically after the weekly payout job runs. Your creator dashboard shows the amount received, the watch hours that earned it, and a transaction hash linking to the on-chain record so you can verify the payment independently.
+
+    Expect your wallet balance to update within seconds to a few minutes of the weekly run completing, thanks to Arbitrum's fast transaction finality.
+  </Accordion>
+
+  <Accordion title="What counts as a verified watch hour?">
+    A verified watch hour is one hour of watch time from a viewer who meets all of the following criteria at the time of viewing:
+
+    - Their subscription is currently active
+    - Their device completed hardware attestation during sign-up (the device's secure chip cryptographically proves a real physical device is watching)
+    - Their session is in the foreground — backgrounded tabs don't accumulate
+    - They haven't exceeded their 50-hour monthly cap
+
+    Watch time is tracked via signed heartbeats sent by the viewer's device every 30 seconds. Each heartbeat is cryptographically verified by the server before the time is counted. Sessions that fail verification — whether due to device issues, expired subscriptions, or suspected automation — don't contribute to your verified hours.
+
+    The system favours quality engagement from genuine viewers over raw view counts, which is what makes it resistant to manipulation.
+  </Accordion>
+
+  <Accordion title="How is my payout calculated?">
+    Your payout is a proportional share of the monthly subscription pool, based on how much verified watch time you earned relative to every other creator on the platform:
+
+    ```
+    Your payout = (your verified watch hours ÷ total platform verified watch hours) × pool balance
+    ```
+
+    **Example:** If the pool holds $10,000 USDC and you earned 40% of all verified watch hours that week, you receive $4,000 USDC.
+
+    The pool is funded by approximately 95% of all subscriber payments (after a ~5% protocol fee). It resets monthly — so the pool balance grows throughout the month as subscriptions renew, and payouts draw from whatever has accumulated by the time each weekly run fires.
+  </Accordion>
+
+  <Accordion title="Can I see or verify the payout calculation myself?">
+    Currently, your creator dashboard shows your watch hours, your share percentage, your USDC earned, and the on-chain transaction hash for each weekly distribution. You can verify that the USDC transfer happened and the amount matches what the dashboard shows by checking the transaction on the Arbitrum block explorer.
+
+    The server-side calculation of watch hours and share percentages is not yet independently verifiable — you're trusting StreamDAO's numbers for that part.
+
+    **After launch**, StreamDAO will publish its engagement scoring logic as open source and commit a merkle root of all creator engagement scores on-chain with each weekly payout. This will allow you to independently verify that your watch hours were correctly included in the calculation using a cryptographic merkle proof — without relying on the platform at all. Until then, contact support if you believe your figures look wrong.
+  </Accordion>
+
+  <Accordion title="What if I think my payout is incorrect?">
+    If your dashboard shows earnings that don't match your expectations, contact StreamDAO support with your creator account details and the specific payout period in question. The support team can review the watch hour aggregation and distribution records for that period.
+
+    A few things are worth checking first:
+
+    - Watch hours only count from viewers with hardware-attested devices on active subscriptions. If a significant portion of your audience is on older or unsupported devices, your verified hours may be lower than your total play count suggests.
+    - The weekly payout draws from the pool accumulated up to that point in the billing cycle. A payout early in the month will be smaller in absolute USDC terms than one later in the month, even if your share percentage is identical.
+    - Your dashboard transaction hash links to the on-chain record — you can verify the USDC transfer amount independently on the Arbitrum block explorer.
+
+    Post-launch, the merkle proof system will allow you to verify your own inclusion and score without needing to contact support at all.
+  </Accordion>
+
+  <Accordion title="Is there a minimum payout amount?">
+    No. There is no minimum payout threshold on StreamDAO. All earnings are distributed automatically each week regardless of amount. If you earned any verified watch hours in a given period, your proportional share of the pool is transferred to your wallet when the weekly run executes.
+  </Accordion>
+</AccordionGroup>

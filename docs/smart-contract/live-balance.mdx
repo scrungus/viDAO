@@ -1,0 +1,51 @@
+---
+title: "Why pool balance is read live"
+description: "The rationale for removing the `pool_balance` storage slot."
+---
+
+The contract does **not** store a `pool_balance` counter. `deposit` does not increment anything, and `distribute` does not decrement anything. Instead, `pool_balance()` reads `IERC20(usdc_token).balanceOf(self)` on every call.
+
+## What we had before
+
+An earlier revision kept an internal `uint256 pool_balance` slot and updated it in both `deposit` and `distribute`. This felt natural — it avoids an extra cross-contract call on reads and matches the way most Solidity accounting contracts are written.
+
+## Why it was removed
+
+The internal counter can drift from the contract's actual USDC balance in at least three ways:
+
+1. **Direct ERC20 transfers.** Anyone can `transfer` USDC to the contract address without going through `deposit`. The contract now owns those funds, but the counter does not know about them. Any `distribute` call sized against the counter would leave those funds stranded.
+2. **Manual top-ups.** The ops model for the MVP involves funding the pool manually (out of band). Every manual top-up would require a separate `deposit` call with a prior `approve`, just to keep the counter in sync.
+3. **Future fee logic.** If we ever add an ERC20 with a transfer fee or rebasing behaviour, the contract's actual balance diverges from any counter that assumed 1:1 transfers.
+
+In every case the drift is silent and one-directional: the contract's real balance is ≥ the counter. That means `distribute` would **under-pay** creators, and the excess would sit forever in the contract with no code path to release it.
+
+Reading the live balance on every call makes drift impossible by construction — there is only one source of truth (the USDC contract) and we always consult it.
+
+## The trade-off
+
+We pay one extra cross-contract call on `pool_balance()` reads and on the safety check inside `distribute()`. On Arbitrum, this is cheap. The saving in operational complexity and the elimination of an entire class of "why are funds stuck" bugs easily justifies the gas.
+
+## What the change looks like in code
+
+```rust
+// distribute() — before the transfers, validate against live balance:
+let pool = {
+    let ctx = Call::new();
+    usdc.balance_of(self.vm(), ctx, this)?
+};
+if total > pool {
+    return Err(InsufficientPool { requested: total, available: pool }.abi_encode());
+}
+```
+
+```rust
+// pool_balance() — no storage read, just a cross-contract call:
+pub fn pool_balance(&self) -> Result<U256, Vec<u8>> {
+    let usdc = IERC20::new(self.usdc_token.get());
+    let this = self.vm().contract_address();
+    let ctx = Call::new();
+    Ok(usdc.balance_of(self.vm(), ctx, this)?)
+}
+```
+
+Note the `Call::new()` (view context) versus `Call::new_mutating(self)` (used inside `deposit` and `distribute` when the cross-contract call is a state-changing `transfer_from` or `transfer`). Stylus is strict about matching context to call type.

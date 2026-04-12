@@ -1,0 +1,66 @@
+---
+title: "API overview"
+description: "Auth model, error conventions, and the silent-failure pattern."
+---
+
+The viDAO API is a handful of Next.js route handlers under `apps/web/src/app/api`. It is not RPC-shaped and it is not REST — it is just "whatever the web app calls directly". These docs are the reference for those calls; the endpoint pages are auto-generated from `openapi.yaml` in this directory.
+
+## Authentication
+
+Three different auth schemes are in play.
+
+### Privy bearer tokens
+
+Most endpoints require a Privy access token in either:
+
+- `Authorization: Bearer <token>` header, or
+- `privy-token` cookie
+
+Tokens are obtained client-side via `getAccessToken()` from `@privy-io/react-auth`, then verified server-side in `apps/web/src/lib/auth.ts` using `PrivyClient.verifyAuthToken`. Verification yields a Privy DID, which is then resolved to a local `User` row by email or wallet address.
+
+Endpoints using this scheme: `/api/auth/register`, `/api/subscription/status`, `/api/dev/fake-subscribe`, `/api/videos/upload`, `/api/videos/{id}`, `/api/watch/start`, `/api/watch/heartbeat`, `/api/watch/end`.
+
+### Cron shared secret
+
+`/api/cron/payout` requires `Authorization: Bearer <CRON_SECRET>`. The secret lives in the `CRON_SECRET` env var. If the server can't find it, the endpoint returns `500 { error: "CRON_SECRET not configured" }`.
+
+### Transak webhook JWT
+
+`/api/subscription/webhook` is unauthenticated at the HTTP layer but the body is an encrypted JWT signed with `TRANSAK_ACCESS_TOKEN` as the HMAC secret. Decryption failures return 400; invalid JWTs return 200 (see silent-failure pattern below).
+
+## Silent failures
+
+Some endpoints deliberately return **HTTP 200 on failure** to avoid leaking state to a caller that could be an attacker.
+
+| Endpoint | Failure mode | Reason |
+|---|---|---|
+| `POST /api/watch/heartbeat` | Auth, session ownership, attestation, subscription, gap-too-large, cap reached — all return 200 | Prevents probing for attestation/subscription state via a side channel. See [heartbeat protocol](/concepts/heartbeat-protocol). |
+| `POST /api/subscription/webhook` | Invalid JWT, unknown event type, user not found — all return 200 | Prevents Transak from retrying a webhook that would never succeed, and avoids leaking "is this wallet registered". |
+
+<Warning>
+Clients must not treat a 200 from these endpoints as a commit. The only way to know that a heartbeat actually credited time is to observe `WatchSession.weightedSeconds` moving in the database.
+</Warning>
+
+## Error conventions
+
+For endpoints that do fail loudly:
+
+```json
+{ "error": "Message describing what went wrong" }
+```
+
+Common status codes:
+
+| Code | Meaning |
+|---|---|
+| 200 | Success, **or** silent failure (see above) |
+| 400 | Malformed request body or missing required field |
+| 401 | Auth missing or invalid |
+| 403 | Authenticated but not authorised (e.g. uploading as a non-CREATOR) |
+| 404 | Resource not found, **or** dev-only endpoint hit in production |
+| 413 | Request body too large (video upload > 500 MB) |
+| 500 | Server error — check logs |
+
+## Servers
+
+Local dev: `http://localhost:3000`. There is no staging or production URL yet — this is an MVP.

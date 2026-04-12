@@ -1,0 +1,75 @@
+---
+title: "Heartbeat protocol"
+description: "The 30-second heartbeat, the 7 checks, and the silent-failure contract."
+---
+
+The heartbeat endpoint is the single point where watch time becomes payout-eligible weighted seconds. Everything about how watch hours are counted happens here. The file is `apps/web/src/app/api/watch/heartbeat/route.ts`.
+
+## Cadence and constants
+
+- Players emit heartbeats every **30 seconds**.
+- Gaps larger than **45 seconds** (`MAX_HEARTBEAT_GAP_SECONDS = 45`) do not accrue time.
+- Monthly cap is **50 hours** (`MONTHLY_CAP_HOURS = 50`) of weighted time per user per month.
+
+The 45-second window is deliberately generous — it allows a single missed heartbeat without killing the session. Two consecutive missed heartbeats re-anchor the timer.
+
+## The 7 checks
+
+The heartbeat handler runs these checks in order. If any check fails, the response is always HTTP 200 with `{ ok: true }`.
+
+<Steps>
+  <Step title="1. User exists">
+    `getCurrentUser()` returns a row from `User` or `null`. On `null`, return 200 — the viewer is not authenticated or not registered.
+  </Step>
+  <Step title="2. Body parseable">
+    Expects `{ sessionId: string }`. If parsing fails, return 200.
+  </Step>
+  <Step title="3. sessionId provided">
+    If missing, return 200.
+  </Step>
+  <Step title="4. Session belongs to user">
+    Loads `WatchSession` by `sessionId` and checks `userId` matches the current user. On mismatch, return 200.
+  </Step>
+  <Step title="5. Hardware attestation">
+    The user's `webauthnAttestationType` must be `HARDWARE`. Software users return 200 with no increment. See [attestation](/concepts/attestation).
+  </Step>
+  <Step title="6. Active subscription">
+    `subscribedUntil > now`. Expired subscribers return 200 with no increment.
+  </Step>
+  <Step title="7. Gap ≤ 45s">
+    `now - session.lastHeartbeatAt` must be ≤ 45 seconds. If the gap is larger, the endpoint re-anchors `lastHeartbeatAt` to `now` but does not credit any time.
+  </Step>
+</Steps>
+
+## The silent-failure contract
+
+<Note>
+**Clients must not treat HTTP 200 as "time was credited".** Every failure path returns 200. The only way to know whether time accrued is to observe that `WatchSession.weightedSeconds` went up — which clients do not see directly.
+</Note>
+
+This is a deliberate design choice. A heartbeat endpoint that returned 401/403/412 would leak information about whether a given session is earning or not. An attacker could use that signal to probe attestation state, subscription status, or gap enforcement without needing full observability. Returning 200 unconditionally removes the side channel.
+
+The trade-off is that client debugging is harder. If a creator says "my viewers aren't counting", the only way to diagnose is to read server logs or inspect the database.
+
+## What happens on a valid heartbeat
+
+All 7 checks pass. The endpoint then runs a Prisma transaction:
+
+1. Compute `incrementSeconds = min(gap, 30)` — never credit more than the nominal heartbeat interval, even if the actual gap was shorter.
+2. Read `MonthlyWatchTotal` for `(userId, YYYY-MM)`.
+3. Compute `remainingSeconds = (50 * 3600) - (weightedHours * 3600)`.
+4. If `remainingSeconds ≤ 0`, the user is at the cap — return 200 without incrementing.
+5. Otherwise, actual increment is `min(incrementSeconds, floor(remainingSeconds))`. This handles the cap boundary case where a partial heartbeat lands the user exactly at 50 hours.
+6. Update `WatchSession.weightedSeconds += actualIncrement` and `WatchSession.lastHeartbeatAt = now`.
+7. Upsert `MonthlyWatchTotal.weightedHours += actualIncrement / 3600`.
+
+Both updates happen in the same transaction so the per-session counter and the per-month total never diverge.
+
+## Gap-too-large re-anchoring
+
+If the gap is > 45 seconds, the endpoint updates `lastHeartbeatAt` to `now` but does **not** increment `weightedSeconds`. This is the "tab was backgrounded and came back" case — the next heartbeat 30 seconds later will see a clean 30-second gap and start accruing again. Without the re-anchor, the next heartbeat would see a 75-second gap and also fail.
+
+## Related endpoints
+
+- `POST /api/watch/start` — creates the `WatchSession` and returns its id. Must be called before heartbeats.
+- `POST /api/watch/end` — updates `lastHeartbeatAt` one final time. Does not zero anything.

@@ -1,0 +1,87 @@
+---
+title: "System overview"
+description: "How the viDAO MVP fits together — web app, database, auth, smart contract, and payout cron."
+---
+
+viDAO is a monorepo with two deployable units: a Next.js 16 web app at `apps/web` and a Stylus smart contract at `contracts/contracts/stylus/payout-pool`. Everything else (auth, storage, video hosting) is a service the web app talks to.
+
+## Request flow
+
+```text
+┌────────┐     heartbeat (30s)     ┌──────────────┐
+│ Browser│ ──────────────────────▶ │ Next.js API  │
+└────────┘                          └──────┬───────┘
+    ▲                                       │
+    │ Privy login                           │ upsert
+    ▼                                       ▼
+┌────────┐                          ┌──────────────┐
+│ Privy  │                          │   Postgres   │
+└────────┘                          └──────┬───────┘
+                                            │ read aggregates
+                                            ▼
+                                    ┌──────────────┐
+                                    │ Payout cron  │
+                                    └──────┬───────┘
+                                            │ distribute(creators, amounts)
+                                            ▼
+                                    ┌──────────────┐
+                                    │ PayoutPool   │
+                                    │   (Stylus)   │
+                                    └──────┬───────┘
+                                            │ USDC transfer
+                                            ▼
+                                    ┌──────────────┐
+                                    │Creator wallet│
+                                    └──────────────┘
+```
+
+## Components
+
+<CardGroup cols={2}>
+  <Card title="apps/web" icon="browser">
+    Next.js 16 App Router. Hosts the UI, API routes, Prisma client, and server-side payout cron.
+  </Card>
+  <Card title="Postgres + Prisma" icon="database">
+    Stores users, videos, watch sessions, monthly totals, and payout history. Accessed via the Prisma v7 adapter.
+  </Card>
+  <Card title="Privy" icon="key">
+    Embedded wallet and WebAuthn enrollment. Access tokens verified server-side on every API call.
+  </Card>
+  <Card title="Transak" icon="credit-card">
+    Fiat → USDC on-ramp for subscriptions. Webhook decrypts a JWT signed with the access token and extends `subscribedUntil` by 30 days.
+  </Card>
+  <Card title="PayoutPool (Stylus)" icon="file-contract">
+    Rust/WASM contract on Arbitrum Sepolia. Receives USDC and distributes to creators on owner-only `distribute` calls.
+  </Card>
+  <Card title="Payout cron" icon="clock">
+    Server-side function in `apps/web/src/server/payout-cron.ts`. Runs on `POST /api/cron/payout` with a shared secret.
+  </Card>
+</CardGroup>
+
+## Directory map
+
+```
+viDAO/
+├── apps/web/                  Next.js 16 frontend + API
+│   ├── prisma/                Schema, migrations, seed
+│   └── src/
+│       ├── app/               App Router routes and API endpoints
+│       ├── components/        React components
+│       ├── lib/               Prisma client, Privy auth, contract helpers
+│       └── server/            Server-only logic (payout cron)
+├── contracts/                 Hardhat 3 + Stylus workspace
+│   ├── contracts/stylus/      Rust contract sources
+│   └── test/                  Hardhat integration tests
+└── docs/                      This documentation
+```
+
+## What's where
+
+| Concern | Path |
+|---|---|
+| Data model | `apps/web/prisma/schema.prisma` |
+| Auth | `apps/web/src/lib/auth.ts` |
+| Heartbeat logic | `apps/web/src/app/api/watch/heartbeat/route.ts` |
+| Payout aggregation | `apps/web/src/server/payout-cron.ts` |
+| Contract source | `contracts/contracts/stylus/payout-pool/src/lib.rs` |
+| Contract ABI + Viem clients | `apps/web/src/lib/contract.ts` |

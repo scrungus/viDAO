@@ -1,0 +1,51 @@
+---
+title: "StreamDAO API: Endpoints and Smart Contract Reference"
+description: "All public StreamDAO HTTP endpoints and the PayoutPool smart contract — auth model, base URL, response format, and the watch session lifecycle."
+---
+
+The StreamDAO API is a set of HTTP endpoints hosted alongside the Next.js web application. All routes live under `/api` and return JSON. Authentication is handled through session cookies issued after a Privy login — there are no API keys. For on-chain interactions, the **PayoutPool** Stylus contract on Arbitrum runs alongside the HTTP API as a separate integration point.
+
+## Base URL
+
+```
+https://your-streamdao-instance.com/api
+```
+
+All paths below are relative to this base. The exact hostname depends on your deployment — StreamDAO is self-hosted.
+
+## Authentication
+
+Requests are authenticated via a session cookie set by the Privy login flow in the web application. There is no token-based auth for direct API consumers at this time. See the [Authentication](/api/authentication) page for the full login and registration flow.
+
+Unauthenticated requests to protected endpoints return `401 Unauthorized`.
+
+## Response format
+
+All responses are `Content-Type: application/json`. There is no envelope wrapper — success responses return the relevant fields at the top level. Error responses return `{ "error": "<message>" }` alongside an appropriate HTTP status code.
+
+## Endpoints
+
+| Method | Path | Auth required | Description |
+|--------|------|:---:|-------------|
+| `POST` | `/api/auth/register` | Yes (Privy session) | Create or update the user record after Privy login. |
+| `POST` | `/api/watch/start` | Yes | Open a new watch session for a video; returns `sessionId`. |
+| `POST` | `/api/watch/heartbeat` | Yes | Report active watch time during playback; always returns `200`. |
+| `POST` | `/api/watch/end` | Yes | Close an active watch session. |
+| `POST` | `/api/videos/upload` | Yes (CREATOR role) | Upload a video file with title and optional description. |
+| `POST` | `/api/subscription/webhook` | No (called by Transak) | Receive Transak payment events and activate subscriptions. |
+
+## Smart contract
+
+The **PayoutPool** contract holds USDC deposited by subscriber payments and distributes it to creators proportionally by verified watch hours. It is deployed on Arbitrum Sepolia for the current testnet phase. Interaction happens through standard EVM tooling (ethers.js, viem, wagmi, or direct `cast` calls).
+
+See the [PayoutPool Contract](/api/payout-pool-contract) reference for the full ABI, function signatures, and code examples.
+
+## Watch session lifecycle
+
+The watch tracking flow involves three endpoints used in sequence by the player:
+
+1. Call `POST /api/watch/start` with a `videoId` to open a session — you receive a `sessionId`.
+2. Every 30 seconds during playback, call `POST /api/watch/heartbeat` with the `sessionId`.
+3. When the user stops watching (page unload, explicit stop), call `POST /api/watch/end` with the `sessionId`.
+
+Watch time only accumulates if the user has an active subscription and a hardware-attested WebAuthn credential. See [Watch Heartbeat](/api/watch-heartbeat) for the full rules.

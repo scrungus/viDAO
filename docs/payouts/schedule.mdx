@@ -1,0 +1,91 @@
+---
+title: "StreamDAO Payout Schedule: Monthly Billing and Weekly Pay"
+description: "Exact timing for StreamDAO billing cycles and creator payouts — monthly pool resets, weekly USDC distributions, and a day-by-day view of a typical month."
+---
+
+StreamDAO runs on two overlapping rhythms: a monthly billing cycle that resets the subscription pool, and a weekly payout cycle that distributes funds to creators. Understanding both will help you know when to expect earnings and how your watch hours translate into USDC.
+
+## The two cycles
+
+**Monthly billing cycle**
+Viewer subscriptions renew every 30 days. Each renewal deposits USDC into the subscription pool. The pool accumulates throughout the month and resets at the end of each billing period — it does not carry over.
+
+**Weekly payout cycle**
+Every 7 days, StreamDAO's payout system runs automatically. It totals up all verified watch hours earned since the last payout, calculates each creator's proportional share of the pool, and calls the smart contract to distribute USDC directly to creator wallets.
+
+<Note>
+  These two cycles run independently. The weekly payout distributes a portion of whatever is in the pool at the time the job runs — not a fixed fraction. A larger pool means larger absolute payouts even for the same share percentage.
+</Note>
+
+## Watch hour accumulation
+
+Watch hours accumulate in real time as viewers stream your content. Your device sends a verified heartbeat every 30 seconds, and each successful heartbeat adds to your verified watch time. There is no delay or batching — hours update continuously throughout the month.
+
+Watch hours reset at the end of each monthly billing period, in sync with the pool reset. A viewer's 50-hour monthly cap also resets at that point.
+
+## When you receive your first payout
+
+If you're a new creator, your first payout arrives after your first full week of active content on the platform. The weekly payout job must run at least once after you have videos published and accumulating watch hours.
+
+<Tip>
+  Upload your content as early in the week as possible to maximise the watch hours that feed into the next payout run.
+</Tip>
+
+## How a typical month looks
+
+Here's a simplified timeline showing how billing, watch hours, and payouts interact over a single month:
+
+```
+Day 1  ─── Monthly pool opens
+           Viewer subscriptions begin depositing USDC into the pool
+
+Day 7  ─── Payout #1 runs
+           Week 1 watch hours tallied → USDC distributed to creator wallets
+
+Day 14 ─── Payout #2 runs
+           Week 2 watch hours tallied → USDC distributed to creator wallets
+
+Day 21 ─── Payout #3 runs
+           Week 3 watch hours tallied → USDC distributed to creator wallets
+
+Day 28 ─── Payout #4 runs
+           Week 4 watch hours tallied → USDC distributed to creator wallets
+
+Day 30 ─── Monthly pool resets
+           Remaining pool balance distributed, watch hours reset to zero
+           New billing period begins on Day 31
+```
+
+<Info>
+  In practice, the pool grows throughout the month as subscriptions renew on rolling 30-day cycles. Payouts earlier in the month draw from a smaller accumulated pool than payouts later in the month. Your share percentage stays the same — the absolute USDC amount reflects the pool size at the time of each run.
+</Info>
+
+## What happens at pool reset
+
+At the end of each monthly billing period:
+
+- All remaining pool balance is distributed in the final payout run
+- Watch hour totals reset to zero for all viewers
+- The pool reopens for the next month's subscriptions
+- Creator earnings accumulate fresh from zero
+
+Unused pool balance does not roll over into the next month. The system is designed so that virtually all subscription revenue is paid out to creators within the same calendar month it was collected.
+
+<Warning>
+  Make sure your wallet is connected and your creator account is in good standing before the monthly reset. If a distribution fails to reach your wallet due to a configuration issue, contact support as soon as possible — the pool cannot be retroactively reopened.
+</Warning>
+
+## USDC delivery time
+
+Once the weekly payout job runs, USDC arrives in your connected wallet as part of an Arbitrum transaction. Arbitrum has fast finality — your balance typically updates within seconds to a few minutes of the payout job completing. You'll see the updated amount in your creator dashboard, along with the transaction hash linking to the on-chain record.
+
+## Schedule at a glance
+
+| Event | Frequency | Notes |
+|---|---|---|
+| Subscription billing | Monthly (rolling) | 30-day cycles per subscriber |
+| USDC deposited to pool | On each renewal | ~95% of subscription fee |
+| Watch hours accumulate | Continuously (30s intervals) | Foreground, hardware-attested sessions only |
+| Weekly payout run | Every 7 days | Proportional to verified watch hours |
+| Pool reset | Monthly | Aligned with billing period |
+| Watch hour cap reset | Monthly | 50hr cap resets per viewer wallet |

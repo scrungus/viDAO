@@ -1,0 +1,144 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "StreamDAO",
+  "theme": "luma",
+  "colors": {
+    "primary": "#565354",
+    "light": "#cacdd1",
+    "dark": "#040404"
+  },
+  "logo": {
+    "light": "https://media.brand.dev/87817459-e95f-4567-aa46-eeeed4e99468.svg",
+    "dark": "https://media.brand.dev/87817459-e95f-4567-aa46-eeeed4e99468.svg"
+  },
+  "favicon": "https://media.brand.dev/d441bf91-5ab4-45b1-8cea-a474ac55c64b.png",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/scrungus/viDAO"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Docs",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "how-it-works",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "For Viewers",
+            "pages": [
+              "viewers/subscribing",
+              "viewers/device-verification",
+              "viewers/watch-hours"
+            ]
+          },
+          {
+            "group": "For Creators",
+            "pages": [
+              "creators/getting-paid",
+              "creators/dashboard",
+              "creators/uploading"
+            ]
+          },
+          {
+            "group": "Payouts",
+            "pages": [
+              "payouts/how-payouts-work",
+              "payouts/pool",
+              "payouts/schedule"
+            ]
+          },
+          {
+            "group": "FAQ",
+            "pages": [
+              "faq/viewers",
+              "faq/creators"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/watch-heartbeat",
+              "api/subscription-webhook",
+              "api/video-upload"
+            ]
+          },
+          {
+            "group": "Smart Contract",
+            "pages": [
+              "api/payout-pool-contract"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developer",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/data-model",
+              "architecture/tech-stack"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/economic-model",
+              "concepts/attestation",
+              "concepts/heartbeat-protocol",
+              "concepts/payout-math"
+            ]
+          },
+          {
+            "group": "Smart contract internals",
+            "pages": [
+              "smart-contract/payout-pool",
+              "smart-contract/live-balance"
+            ]
+          },
+          {
+            "group": "Runbooks",
+            "pages": [
+              "runbooks/local-dev",
+              "runbooks/seeding",
+              "runbooks/testing",
+              "runbooks/env-vars",
+              "runbooks/mock-transak"
+            ]
+          },
+          {
+            "group": "Internal API",
+            "pages": [
+              "api-reference/overview",
+              {
+                "group": "Endpoints",
+                "openapi": "api-reference/openapi.yaml"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,82 @@
+---
+title: "How StreamDAO Creator Payouts Work End-to-End"
+description: "Follow your subscription fee from card payment into the shared USDC pool through to weekly creator payouts — with the share formula and a worked example."
+---
+
+StreamDAO takes a different approach to paying creators. Instead of deciding who gets what, the platform lets viewers decide — automatically — just by watching. Every month, subscription revenue pools together into a shared fund, and every week that fund is distributed to creators based on how much verified watch time they earned. No algorithms picking winners. No platform taking 30–45%. Your subscription works directly for the creators you watch.
+
+Here's the full flow from payment to payout.
+
+<Steps>
+  <Step title="You subscribe and your payment enters the pool">
+    When you subscribe, your card payment is converted to USDC (a US dollar-pegged stablecoin) and deposited directly into the StreamDAO subscription pool — a smart contract on Arbitrum. After a small protocol fee of approximately 5%, the remainder sits in the pool, fully visible on-chain, waiting to be distributed to creators.
+
+    You never handle USDC directly. The conversion happens in the background, and your subscription experience looks and feels like any other streaming service.
+  </Step>
+  <Step title="You watch, and your device verifies every session">
+    While you stream, your device sends a cryptographic heartbeat every 30 seconds. This heartbeat is signed by a key that lives inside your device's secure hardware chip — the same chip that powers Face ID or fingerprint unlock. The server verifies each heartbeat to confirm that a real, physical device is actively watching.
+
+    Watch hours only accumulate when all three conditions are met:
+    - Your subscription is active
+    - Your device passed hardware attestation during sign-up
+    - Your session is in the foreground (backgrounded tabs don't count)
+
+    Hours accumulate per creator — so if you watch an hour of Creator A and two hours of Creator B, both receive credit for your time. There's a 50-hour monthly cap per account to keep the system fair for everyone.
+  </Step>
+  <Step title="The platform aggregates verified watch hours weekly">
+    Once a week, StreamDAO's payout system tallies up all verified watch hours across every creator on the platform. Each creator's share is calculated as a proportion of the total:
+
+    **Creator share = (creator's verified watch hours) ÷ (all verified watch hours on the platform) × pool balance**
+
+    This calculation happens server-side and is checked against the on-chain pool balance before any funds move.
+  </Step>
+  <Step title="The smart contract distributes USDC to creator wallets">
+    Once the shares are calculated, the payout system triggers the PayoutPool smart contract on Arbitrum. The contract verifies that the total payout doesn't exceed the pool balance, then transfers USDC directly to each creator's connected wallet in a single transaction batch.
+
+    Every distribution is recorded on-chain with a transaction hash, so any payout can be independently verified on the Arbitrum block explorer.
+  </Step>
+  <Step title="Creators see updated earnings in their dashboard">
+    After the weekly distribution runs, creators can log into their dashboard to see their earnings for the period, broken down by total watch hours, share percentage, and USDC received. The transaction hash links directly to the on-chain record.
+  </Step>
+</Steps>
+
+## The share formula
+
+```
+Your USDC payout = (your verified watch hours / total platform verified watch hours) × pool balance
+```
+
+### Worked example
+
+Imagine it's the end of a payout week with these numbers:
+
+| | |
+|---|---|
+| Monthly subscription pool | $10,000 USDC |
+| Total verified watch hours (all creators) | 25,000 hours |
+| Creator A's verified watch hours | 10,000 hours |
+| Creator A's share | 10,000 ÷ 25,000 = **40%** |
+| **Creator A's payout** | **$4,000 USDC** |
+
+If Creator B had 5,000 hours (20% of the total), they'd receive $2,000 USDC in the same weekly run.
+
+<Note>
+  The pool resets at the end of each monthly billing period. Unused pool balance does not roll over. This keeps maximum platform exposure bounded to one month of subscription revenue at any time.
+</Note>
+
+## What counts as a "verified watch hour"
+
+Not all watch time counts equally — only **verified watch hours** feed into the payout formula. A watch hour is verified when:
+
+- The viewing device completed hardware attestation during sign-up (devices without hardware support can still watch, but their hours don't count toward creator payouts)
+- The viewer's subscription is active at the time of viewing
+- The session is in the foreground and producing valid signed heartbeats
+- The viewer is within their 50-hour monthly cap
+
+<Info>
+  **Coming after launch:** StreamDAO's engagement scoring logic will be published as open source, and merkle roots of all engagement scores will be committed on-chain weekly. Creators will be able to independently verify their score was included correctly using a merkle proof — without needing to trust the platform's calculations.
+</Info>
+
+## Why this model is different
+
+Most platforms take a large cut and decide how to distribute what remains based on proprietary algorithms. StreamDAO routes almost all subscription revenue directly to creators, and the distribution is determined entirely by verified viewer behaviour — not editorial decisions, not ad revenue, not follower counts. The more genuinely engaged your audience is, the more you earn.

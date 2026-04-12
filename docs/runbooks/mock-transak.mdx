@@ -1,0 +1,58 @@
+---
+title: "Mock Transak for local dev"
+description: "How the dev-only fake-subscribe flow works and when to use it."
+---
+
+Transak's sandbox webhooks cannot reach `localhost`, which makes real subscription testing impossible in local dev. viDAO ships a mock path: a flag plus a dev-only route that directly extends `subscribedUntil` by 30 days.
+
+## Turning it on
+
+Set in `apps/web/.env`:
+
+```bash
+NEXT_PUBLIC_DEV_MOCK_TRANSAK="true"
+```
+
+Restart `npm run dev`. The `SubscribeButton` component reads this at module load time; a hot reload of the env var won't pick it up until the dev server restarts.
+
+## How it works
+
+When the flag is `"true"`, clicking "Subscribe" in the UI:
+
+1. Fetches the current Privy access token via `getAccessToken()`.
+2. `POST`s to `/api/dev/fake-subscribe` with `Authorization: Bearer <token>`.
+3. The server verifies the Privy token, looks up the current user, and sets `subscribedUntil = max(now, existing) + 30 days`.
+4. The client calls `router.refresh()` to reflect the new subscription state in the UI.
+
+With the flag unset (or `"false"`), the button opens the real Transak widget — and subscription events must come in through `/api/subscription/webhook`, which requires that Transak can actually reach your server.
+
+## The route
+
+`apps/web/src/app/api/dev/fake-subscribe/route.ts` guards itself on two conditions:
+
+```ts
+if (
+  process.env.NODE_ENV === "production" ||
+  process.env.NEXT_PUBLIC_DEV_MOCK_TRANSAK !== "true"
+) {
+  return NextResponse.json({ error: "Not found" }, { status: 404 });
+}
+```
+
+<Warning>
+The route returns **404** in production regardless of the env var, and 404 in development if the mock flag isn't explicitly `"true"`. This double-guard is deliberate — the worst failure mode is accidentally shipping a "free 30 days of subscription" endpoint to a real environment.
+</Warning>
+
+The remaining logic is trivial: load the current user, compute `base = max(now, user.subscribedUntil)`, write `base + 30 days`, return `{ subscribedUntil }`.
+
+## When to use it
+
+- Local dev against a fresh database — get a user subscribed in one click.
+- Testing subscription-gated UI (watch button, heartbeat behaviour, creator upload visibility).
+- Reproducing the "subscription just expired" state by manually editing the row afterwards.
+
+## When not to use it
+
+- Any environment that isn't local.
+- Testing the real Transak JWT-decrypt path — use sandbox Transak with a tunnelled domain for that.
+- Testing the webhook retry semantics — the mock is a direct POST, not a webhook.

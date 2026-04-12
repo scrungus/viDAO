@@ -1,0 +1,127 @@
+---
+title: "Watch Heartbeat — POST /api/watch/heartbeat"
+description: "Report active playback every 30 seconds to accumulate verified watch time. Always returns HTTP 200 — requires hardware attestation and an active subscription."
+---
+
+The heartbeat endpoint is the mechanism by which the StreamDAO player reports that a user is actively watching a video. Your client should call it every 30 seconds during playback. The endpoint is intentionally silent — it always returns `HTTP 200 { "ok": true }` regardless of whether the heartbeat was counted. This prevents the player from receiving information about subscription or attestation status mid-session.
+
+Before sending heartbeats, you must open a watch session with `POST /api/watch/start` and use the returned `sessionId` in every heartbeat call.
+
+## Request
+
+```
+POST /api/watch/heartbeat
+Content-Type: application/json
+```
+
+A valid session cookie must be present on the request.
+
+<ParamField body="sessionId" type="string" required>
+  The watch session ID returned by `POST /api/watch/start`. The heartbeat is silently discarded if this session does not belong to the authenticated user.
+</ParamField>
+
+## Response
+
+The endpoint always returns `HTTP 200` with the following body, regardless of whether the heartbeat was counted:
+
+<ResponseField name="ok" type="boolean">
+  Always `true`. A `true` value does not indicate that watch time was credited — only that the request was received.
+</ResponseField>
+
+```json
+{
+  "ok": true
+}
+```
+
+## How watch time is counted
+
+Not every heartbeat results in credited watch time. The following conditions must all be true for seconds to accumulate on the session:
+
+### 1. Active subscription
+
+The user's `subscribedUntil` timestamp must be in the future. If the subscription has expired, the heartbeat is acknowledged but no time is credited.
+
+### 2. Hardware attestation
+
+The user must have registered a WebAuthn credential with `attestationType: "HARDWARE"` (see [Authentication](/api/authentication)). Software-attested or non-attested accounts are excluded from watch time accumulation and therefore from payout pool allocation.
+
+### 3. Gap under 45 seconds
+
+The server measures the gap between the current heartbeat and the previous one (or session start). If the gap exceeds **45 seconds**, the timer is re-anchored to the current timestamp without crediting the missing interval. This handles tab switches, device sleep, network interruptions, and paused playback. The session continues normally after re-anchoring — subsequent heartbeats are credited as usual.
+
+Sending heartbeats every 30 seconds keeps the gap safely under the 45-second threshold.
+
+### 4. Monthly cap not reached
+
+Each user is capped at **50 hours** of credited watch time per calendar month. Once the cap is reached, further heartbeats are acknowledged but no additional time is added. The cap resets at the start of each month.
+
+If a heartbeat would push the user over the 50-hour cap, only the seconds up to the cap are credited — the remainder is discarded.
+
+<Tip>
+  The player does not need to handle any of these conditions. Design your integration to send a heartbeat every 30 seconds and treat every `200` response as successful. The server enforces all constraints silently.
+</Tip>
+
+## Watch session lifecycle
+
+```
+POST /api/watch/start   →  { sessionId }
+        │
+        │   every 30s during playback
+        ▼
+POST /api/watch/heartbeat  { sessionId }  →  { ok: true }
+        │
+        │   on stop / unload
+        ▼
+POST /api/watch/end     { sessionId }  →  { ok: true }
+```
+
+## Example
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://your-streamdao-instance.com/api/watch/heartbeat \
+  -H "Content-Type: application/json" \
+  --cookie "privy-session=<your-session-cookie>" \
+  -d '{"sessionId": "cm9xr3z9e20000o8kw3k9d5f1a"}'
+```
+
+```ts TypeScript
+// Start a session when the player loads
+const { sessionId } = await fetch('/api/watch/start', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ videoId: 'cm9video123' }),
+}).then(r => r.json());
+
+// Send heartbeats every 30 seconds
+const heartbeatInterval = setInterval(async () => {
+  await fetch('/api/watch/heartbeat', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId }),
+  });
+}, 30_000);
+
+// End the session on teardown
+function stopWatching() {
+  clearInterval(heartbeatInterval);
+  navigator.sendBeacon(
+    '/api/watch/end',
+    JSON.stringify({ sessionId }),
+  );
+}
+
+window.addEventListener('beforeunload', stopWatching);
+```
+</CodeGroup>
+
+<Note>
+  Use `navigator.sendBeacon` (or the Page Visibility API) to send the end-session call reliably on tab close or navigation. Regular `fetch` calls may be cancelled before they complete during an unload event.
+</Note>
+
+## Error handling
+
+Do not implement retry logic or surface heartbeat errors to the user. The endpoint is designed to be fire-and-forget. If a heartbeat is dropped due to a network error, the 45-second gap threshold ensures the timer re-anchors cleanly on the next successful heartbeat.

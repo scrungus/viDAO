@@ -1,0 +1,85 @@
+---
+title: "Seeding the database"
+description: "What `prisma db seed` creates and which user to log in as."
+---
+
+The seed script at `apps/web/prisma/seed.ts` populates a fully-formed local environment: creators with videos, viewers in different states, pre-existing watch sessions, and a completed payout period. Running it gives you something to click through without having to onboard by hand.
+
+## How to run
+
+```bash
+cd apps/web
+npm run prisma:seed
+```
+
+The script first deletes everything in `CreatorPayout`, `PayoutPeriod`, `MonthlyWatchTotal`, `WatchSession`, `Video`, and `User` — then repopulates. It is safe to run repeatedly; it is destructive on purpose.
+
+## What gets created
+
+### 3 creators
+
+| Email | Role | Attestation |
+|---|---|---|
+| `alice@example.com` | `CREATOR` | `HARDWARE` |
+| `bob@example.com` | `CREATOR` | `HARDWARE` |
+| `carol@example.com` | `CREATOR` | `HARDWARE` |
+
+Each has placeholder wallet addresses (`0xAlice…`, `0xBob…`, `0xCarol…`) — not real addresses, so the payout cron's on-chain `distribute` call would fail against them. For end-to-end contract testing, replace these with real Sepolia addresses.
+
+### 5 viewers
+
+| Email | Attestation | `subscribedUntil` |
+|---|---|---|
+| `viewer1@example.com` | `HARDWARE` | now + 30 days |
+| `viewer2@example.com` | `SOFTWARE` | now + 30 days |
+| `viewer3@example.com` | `HARDWARE` | now − 7 days (expired) |
+| `viewer4@example.com` | (default `SOFTWARE`) | null (never subscribed) |
+| `viewer5@example.com` | (default `SOFTWARE`) | null (never subscribed) |
+
+`viewer1` is the interesting one for demos: hardware attested and actively subscribed, so heartbeat-driven watch time actually accrues. `viewer2` is the "software attested" counterfactual — logs in, subscribes, watches, but `weightedSeconds` stays at 0.
+
+### 8 videos
+
+3 by Alice (intro to streaming, Arbitrum, WebAuthn), 3 by Bob (creator economics, smart-contract security, L2 scaling), 2 by Carol (Web3 UX, privacy-preserving tracking). `videoPath` fields point at files under `/videos/` — you will need to supply real files at `VIDEO_UPLOAD_DIR` or the player will 404.
+
+### Watch sessions
+
+75 pre-populated `WatchSession` rows:
+
+- 40 for `viewer1` (near the 50-hour cap, 45-minute sessions each)
+- 20 for `viewer2` (non-counting, `weightedSeconds = 0`)
+- 15 for `viewer3` (old sessions, pre-expiration)
+
+### Monthly totals
+
+One `MonthlyWatchTotal` per active viewer for the current month — `viewer1` is at 48.5 hours (near the cap), `viewer2` is at 0, `viewer3` is at 5.
+
+### Completed payout period
+
+One `PayoutPeriod` from last week marked `DISTRIBUTED`, with three `CreatorPayout` rows:
+
+- Alice: 15 hrs → 50% → 50 USDC
+- Bob: 10 hrs → 33.3% → 33.33 USDC
+- Carol: 5 hrs → 16.7% → 16.67 USDC
+
+The `txHash` values are fake strings. This gives the creator dashboard something to render without a real on-chain call.
+
+## Which user to log in as
+
+Privy login is by email, so you can't directly "become" a seeded user. The realistic local flow is:
+
+1. Run the seed.
+2. Log in through Privy with your own email — you become a new `VIEWER` row.
+3. If you need creator access, manually flip your row:
+
+```sql
+UPDATE "User" SET role = 'CREATOR' WHERE email = 'your@email';
+```
+
+4. If you need to watch time to count, flip yourself to hardware:
+
+```sql
+UPDATE "User" SET "webauthnAttestationType" = 'HARDWARE' WHERE email = 'your@email';
+```
+
+Or enroll a real passkey from the profile page.

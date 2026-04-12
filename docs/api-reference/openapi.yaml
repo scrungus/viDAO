@@ -1,0 +1,456 @@
+openapi: 3.1.0
+info:
+  title: viDAO API
+  version: 0.1.0
+  description: |
+    Internal API for the viDAO MVP. Most endpoints require a Privy access token;
+    a few have specialised auth (cron secret, Transak JWT). See the Overview page
+    for the auth model and the silent-failure pattern used by the heartbeat and
+    webhook routes.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+components:
+  securitySchemes:
+    privyBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Privy access token. Client obtains via `getAccessToken()`.
+    cronSecret:
+      type: http
+      scheme: bearer
+      description: Shared secret from the CRON_SECRET env var.
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    UserRole:
+      type: string
+      enum: [VIEWER, CREATOR]
+    AttestationType:
+      type: string
+      enum: [HARDWARE, SOFTWARE]
+    RegisterRequest:
+      type: object
+      properties:
+        webauthnCredentialId:
+          type: string
+          description: Credential ID from a successful WebAuthn enrollment.
+        attestationType:
+          $ref: '#/components/schemas/AttestationType'
+    RegisterResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+      required: [userId, role]
+    SubscriptionStatus:
+      type: object
+      properties:
+        subscribed:
+          type: boolean
+        subscribedUntil:
+          type: string
+          format: date-time
+          nullable: true
+        role:
+          $ref: '#/components/schemas/UserRole'
+      required: [subscribed, role]
+    FakeSubscribeResponse:
+      type: object
+      properties:
+        subscribedUntil:
+          type: string
+          format: date-time
+      required: [subscribedUntil]
+    Ok:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required: [ok]
+    VideoUploadResponse:
+      type: object
+      properties:
+        videoId:
+          type: string
+      required: [videoId]
+    WatchStartRequest:
+      type: object
+      properties:
+        videoId:
+          type: string
+      required: [videoId]
+    WatchStartResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+      required: [sessionId]
+    HeartbeatRequest:
+      type: object
+      properties:
+        sessionId:
+          type: string
+      required: [sessionId]
+    WatchEndRequest:
+      type: object
+      properties:
+        sessionId:
+          type: string
+      required: [sessionId]
+    CronResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [DISTRIBUTED, PENDING, SKIPPED]
+        periodStart:
+          type: string
+          format: date-time
+        periodEnd:
+          type: string
+          format: date-time
+        totalPoolUsdc:
+          type: number
+        payouts:
+          type: array
+          items:
+            type: object
+            properties:
+              creatorId:
+                type: string
+              watchHours:
+                type: number
+              sharePercentage:
+                type: number
+              usdcAmount:
+                type: number
+              txHash:
+                type: string
+                nullable: true
+
+paths:
+  /api/auth/register:
+    post:
+      summary: Register or update the current user
+      description: |
+        Upserts a `User` row for the authenticated Privy identity. Called from
+        the onboarding flow and from the profile passkey-enrollment button.
+      tags: [Auth]
+      security:
+        - privyBearer: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: User upserted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Email missing from the Privy user.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Privy token missing or invalid.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/subscription/status:
+    post:
+      summary: Get current subscription status
+      description: Returns whether the authenticated user has an active subscription.
+      tags: [Subscription]
+      security:
+        - privyBearer: []
+      responses:
+        '200':
+          description: Subscription status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionStatus'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/subscription/webhook:
+    post:
+      summary: Transak subscription webhook
+      description: |
+        Receives Transak order events as an encrypted JWT. Decrypts with
+        `TRANSAK_ACCESS_TOKEN` as HMAC secret, acts only on `ORDER_COMPLETED`,
+        and extends `subscribedUntil` by 30 days for the matched wallet.
+
+        Always returns 200 to prevent Transak retries — see the Overview page
+        for the silent-failure pattern.
+      tags: [Subscription]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: string
+                  description: Encrypted JWT payload.
+      responses:
+        '200':
+          description: Always, regardless of whether the event was acted on.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+
+  /api/dev/fake-subscribe:
+    post:
+      summary: Dev-only fake subscription
+      description: |
+        Extends `subscribedUntil` by 30 days without involving Transak. Requires
+        `NEXT_PUBLIC_DEV_MOCK_TRANSAK=true` and `NODE_ENV !== "production"`;
+        returns 404 otherwise. See the Mock Transak runbook.
+      tags: [Subscription]
+      security:
+        - privyBearer: []
+      responses:
+        '200':
+          description: Subscription extended.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FakeSubscribeResponse'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Not found — the mock flag is off or `NODE_ENV=production`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/videos/upload:
+    post:
+      summary: Upload a new video
+      description: |
+        Creator-only multipart upload. Max body 500 MB. Stores the file under
+        `VIDEO_UPLOAD_DIR` and best-effort generates a thumbnail via ffmpeg.
+        Thumbnail failure does not fail the upload.
+      tags: [Videos]
+      security:
+        - privyBearer: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+              required: [title, file]
+      responses:
+        '200':
+          description: Video created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoUploadResponse'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Authenticated user is not a CREATOR.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '413':
+          description: File exceeds 500 MB.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/videos/{id}:
+    delete:
+      summary: Delete a video
+      description: |
+        Only the creator who owns the video can delete it. Cascades to delete
+        `WatchSession` rows first, then the video row, then best-effort unlinks
+        the file and thumbnail from disk.
+      tags: [Videos]
+      security:
+        - privyBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Video deleted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Not the owner of this video.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Video not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/watch/start:
+    post:
+      summary: Start a watch session
+      description: |
+        Creates a `WatchSession` row with the current timestamp as both
+        `startedAt` and `lastHeartbeatAt`. Returns the session id, which the
+        client then passes to `/api/watch/heartbeat`.
+      tags: [Watch]
+      security:
+        - privyBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatchStartRequest'
+      responses:
+        '200':
+          description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchStartResponse'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/watch/heartbeat:
+    post:
+      summary: Heartbeat for an active watch session
+      description: |
+        Every 30 seconds, the player POSTs here with the session id. The handler
+        runs seven sequential checks (user exists, body parseable, sessionId
+        present, session belongs to user, hardware-attested, active subscription,
+        gap <= 45s) and, on success, increments `WatchSession.weightedSeconds`
+        and `MonthlyWatchTotal.weightedHours` inside a transaction, capped at
+        50 hours/month.
+
+        **Every failure path returns 200 with `{ ok: true }`.** Clients MUST NOT
+        treat a 200 as "time was credited". See the Heartbeat Protocol concept
+        page for the full rationale.
+      tags: [Watch]
+      security:
+        - privyBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeartbeatRequest'
+      responses:
+        '200':
+          description: |
+            Always. The body is `{ ok: true }` whether the heartbeat was credited,
+            silently dropped, or the session was re-anchored after a gap.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+
+  /api/watch/end:
+    post:
+      summary: End a watch session
+      description: |
+        Updates `lastHeartbeatAt` to the current time. Does not zero any counter
+        — the session row is kept for later aggregation by the payout cron.
+      tags: [Watch]
+      security:
+        - privyBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatchEndRequest'
+      responses:
+        '200':
+          description: Session ended.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/cron/payout:
+    post:
+      summary: Run the weekly payout cron
+      description: |
+        Aggregates `WatchSession.weightedSeconds` by creator, reads live
+        `pool_balance()` from the PayoutPool contract, computes proportional
+        amounts, and calls `distribute(creators, amounts)` if
+        `DEPLOYER_PRIVATE_KEY` is set. Writes a `PayoutPeriod` row plus one
+        `CreatorPayout` per non-zero creator in either case.
+
+        Guarded by `Authorization: Bearer $CRON_SECRET`.
+      tags: [Cron]
+      security:
+        - cronSecret: []
+      responses:
+        '200':
+          description: Cron completed (may have distributed or been a no-op).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CronResult'
+        '401':
+          description: Wrong or missing cron secret.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: |
+            CRON_SECRET not configured, or the on-chain `distribute` call
+            failed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }

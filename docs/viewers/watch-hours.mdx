@@ -1,0 +1,62 @@
+---
+title: "Watch Hours on StreamDAO: How They Accumulate and Cap"
+description: "Understand how verified watch hours build up during playback, what pauses them, how the 50-hour monthly cap works, and when hours do not count toward payouts."
+---
+
+Every minute you spend actively watching on StreamDAO contributes to a creator's share of the monthly payout pool. Your watch hours are the measure of that contribution. They accumulate silently in the background while you watch, reset at the start of each calendar month, and are capped at 50 hours per month per account.
+
+## How hours accumulate
+
+Your hours update every 30 seconds while you're watching. The player sends a small background signal — called a heartbeat — to confirm you're still actively viewing. Each confirmed heartbeat adds that interval to your total.
+
+For hours to accumulate, all of the following must be true at the moment each heartbeat is sent:
+
+- **Your subscription is active** — lapsed or cancelled subscriptions don't accumulate hours
+- **Your device is verified** — your device must have passed hardware verification during sign-up (see [device verification](/viewers/device-verification))
+- **The tab is in the foreground** — if you switch to another app or browser tab, accumulation pauses
+- **You haven't been paused for more than 45 seconds** — gaps longer than 45 seconds (pauses, network interruptions, or backgrounded tabs) break the current interval; accumulation resumes from the next heartbeat after you return
+
+<Tip>
+  You don't need to do anything differently to accumulate watch hours. Just watch normally with the tab in focus and your subscription active.
+</Tip>
+
+## The 50-hour monthly cap
+
+<Note>
+  Each account can accumulate a maximum of **50 verified watch hours per calendar month**. After you reach 50 hours, you can keep watching as much as you like — but no additional hours are added to your total, and creators don't receive further credit from your session for that month.
+
+  The cap exists to keep the payout pool fair. Without it, a single device watching on a loop could accumulate far more hours than any real viewer — inflating one creator's share and reducing what everyone else earns. At 50 hours (roughly 10 hours a week), the cap comfortably covers genuine viewing habits while making large-scale manipulation economically unviable.
+</Note>
+
+The cap resets at the start of each calendar month, so your counter goes back to zero in January, February, and so on — regardless of when in the month you last subscribed or renewed.
+
+## What doesn't count
+
+The following do not accumulate watch hours:
+
+| Situation | Why hours don't count |
+|---|---|
+| Tab is in the background | Heartbeat detects the tab is not in focus |
+| Paused for more than 45 seconds | Gap exceeds the allowed interval between heartbeats |
+| Subscription has lapsed | Account is not in an active paid state |
+| Device failed hardware verification | Sessions from unverified devices are excluded from payout calculations |
+| Monthly cap already reached (50 hrs) | No further accumulation until next calendar month |
+
+## Where to see your hours
+
+You can view your current month's watch hours in your account profile. The total shown reflects only verified, counted hours — it won't include time from backgrounded sessions or from periods when your subscription was inactive.
+
+<AccordionGroup>
+  <Accordion title="Why does the counter sometimes not increase even though I'm watching?">
+    A few things can interrupt accumulation: switching tabs, pausing for more than 45 seconds, or a brief network hiccup that breaks the heartbeat signal. Hours resume accumulating automatically once you're back to active viewing in the foreground.
+  </Accordion>
+  <Accordion title="Do my hours carry over to the next month?">
+    No. The counter resets to zero at the start of each calendar month. Unused hours below the 50-hour cap do not roll over.
+  </Accordion>
+  <Accordion title="Does watching the same video multiple times count?">
+    Yes — each active viewing session accumulates hours regardless of whether you've watched the same video before, as long as your account meets the other conditions above.
+  </Accordion>
+  <Accordion title="What happens to my hours if I cancel my subscription mid-month?">
+    Hours you've already accumulated stay on record for that month's payout calculation. If you resubscribe later in the same month, accumulation resumes from where your previous total left off (up to the 50-hour cap).
+  </Accordion>
+</AccordionGroup>

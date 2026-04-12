@@ -1,0 +1,61 @@
+---
+title: "Economic model"
+description: "How subscription dollars become creator payouts."
+---
+
+viDAO has one pool and two sides. Subscribers pay into it; creators receive from it in proportion to verified watch hours. There is no advertising, and the platform does not take a percentage cut beyond a small protocol fee reserved for operational costs.
+
+## The invariant
+
+For any given payout period:
+
+```text
+sum(creator payouts) ≤ pool_balance() at the moment the cron ran
+```
+
+The contract enforces this strictly — a `distribute` call where `sum(amounts) > pool_balance()` reverts with `InsufficientPool`. See [live balance](/smart-contract/live-balance) for why this is read live from the ERC20 rather than tracked in contract storage.
+
+## Why the subscription-equals-pool mechanic matters
+
+A bot paying £10/month can only extract up to £10/month back out. That bounds the profitable attack surface to **engagement farming at scale** — running many devices watching one creator to inflate their share of a fixed pool.
+
+Hardware attestation makes this prohibitively expensive. Each farm session requires a real device with WebAuthn hardware attestation (iPhone 5s+, Android StrongBox, TPM 2.0 PCs, T2/Apple Silicon Macs) costing £200–500. At that hardware cost, ROI on pool manipulation is negative.
+
+Software-attested users can watch content, but their `weightedSeconds` never increments — they pay, but their watch time does not move the pool. See [attestation](/concepts/attestation) for the full picture.
+
+## The 50-hour cap
+
+Weighted watch hours per user per month are capped at **50**. Enforced inside the heartbeat endpoint via `MonthlyWatchTotal`.
+
+The cap is the primary defence against engagement farming even above the attestation cost. At 50 hours per wallet, a fake device can generate at most ~1.25× the hours a real subscriber accumulates — once hardware acquisition cost is added, the attack economics go negative.
+
+<Note>
+The cap is a manually tuned operational parameter. It is not dynamic or on-chain. Dynamic caps would be vulnerable to majority-device governance attacks.
+</Note>
+
+## What counts as a watch hour
+
+Watch time only accrues when **all** of these are true:
+
+1. The user is registered and active
+2. The session is owned by the current user
+3. The user's attestation is `HARDWARE`
+4. The user has an active subscription (`subscribedUntil > now`)
+5. Time since the previous heartbeat is ≤ 45 seconds
+6. The user is under the 50-hour monthly cap
+
+Failing any check returns HTTP 200 with no increment. See [heartbeat protocol](/concepts/heartbeat-protocol) for the full sequence.
+
+## How dollars flow
+
+1. User clicks subscribe → Transak (or the dev mock) charges their card and mints USDC.
+2. Transak webhook → `subscribedUntil` extended by 30 days.
+3. Someone (out of band for MVP) deposits USDC into the `PayoutPool` contract.
+4. Weekly: the payout cron aggregates `WatchSession.weightedSeconds` by creator, reads `pool_balance()` on-chain, computes proportional amounts, calls `distribute(creators, amounts)`.
+5. The contract transfers USDC from itself to each creator address in one transaction.
+
+## What the MVP does not do (yet)
+
+- Protocol fee extraction — the cron currently distributes 100% of the pool.
+- Merkle commitments and pull-based creator claims (deferred to post-MVP).
+- Automatic USDC deposits from subscription revenue — the USDC inflow is currently operated manually.

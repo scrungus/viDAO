@@ -1,0 +1,99 @@
+---
+title: "Authenticating Requests with the StreamDAO API"
+description: "StreamDAO API requests are authenticated via Privy session cookies. Learn how to register after login and what errors to expect when unauthenticated."
+---
+
+StreamDAO uses [Privy](https://privy.io) for identity. When a user completes the sign-in flow in the web application, Privy issues a session cookie that is automatically attached to subsequent same-origin requests. The API reads that cookie server-side — there are no bearer tokens or API keys to manage.
+
+If you are building a server-side integration or a custom client that sends requests directly, you must first authenticate through the Privy web flow to obtain a valid session cookie, then include it with each request.
+
+## Registering after login
+
+After a successful Privy login, your client should call `POST /api/auth/register`. This endpoint creates the user record in the StreamDAO database (or updates it if the user already exists). It also accepts an optional WebAuthn credential, which is required for hardware-attested watch time to accumulate.
+
+<Note>
+  This endpoint must be called after every Privy login to keep the database record in sync with the Privy identity, especially when updating a WebAuthn credential.
+</Note>
+
+### Request
+
+```
+POST /api/auth/register
+Content-Type: application/json
+```
+
+The request body is optional. Omit it entirely if you are registering without a WebAuthn credential.
+
+<ParamField body="webauthnCredentialId" type="string">
+  The credential ID returned by the browser's WebAuthn registration ceremony (`navigator.credentials.create`). Required if you want hardware-attested watch time to count toward payouts.
+</ParamField>
+
+<ParamField body="attestationType" type='"HARDWARE" | "SOFTWARE"'>
+  The attestation type of the WebAuthn credential. Set to `"HARDWARE"` for platform authenticators (Face ID, Touch ID, Windows Hello, hardware security keys). Defaults to `"SOFTWARE"` if omitted. Only `HARDWARE` watch time counts toward payout pool allocation.
+</ParamField>
+
+### Response
+
+<ResponseField name="userId" type="string">
+  The internal StreamDAO user ID (UUID).
+</ResponseField>
+
+<ResponseField name="role" type='"VIEWER" | "CREATOR"'>
+  The user's role. Creators have access to the video upload endpoint. Viewers do not.
+</ResponseField>
+
+### Example
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://your-streamdao-instance.com/api/auth/register \
+  -H "Content-Type: application/json" \
+  --cookie "privy-session=<your-session-cookie>" \
+  -d '{
+    "webauthnCredentialId": "AQIDBAUGBwgJCgsM...",
+    "attestationType": "HARDWARE"
+  }'
+```
+
+```ts TypeScript (fetch)
+const res = await fetch('/api/auth/register', {
+  method: 'POST',
+  credentials: 'include', // sends session cookie automatically
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    webauthnCredentialId: credential.id,
+    attestationType: 'HARDWARE',
+  }),
+});
+
+const { userId, role } = await res.json();
+console.log(userId, role); // "clx...", "VIEWER"
+```
+</CodeGroup>
+
+```json Response
+{
+  "userId": "clxr3z9e20000o8kw3k9d5f1a",
+  "role": "VIEWER"
+}
+```
+
+## Unauthenticated requests
+
+Any endpoint that requires a session will return `401 Unauthorized` if the session cookie is missing, invalid, or expired:
+
+```json
+HTTP/1.1 401 Unauthorized
+
+{
+  "error": "Unauthorized"
+}
+```
+
+<Warning>
+  The heartbeat endpoint (`POST /api/watch/heartbeat`) is an exception — it silently returns `200 { "ok": true }` even when unauthenticated, to avoid leaking information to the player. See [Watch Heartbeat](/api/watch-heartbeat) for details.
+</Warning>
+
+## Session management
+
+Session cookies are managed entirely by Privy. Refresh, expiry, and revocation are handled by the Privy SDK in the web application. If you are building a custom client, refer to the Privy documentation for your platform to handle token lifecycle.

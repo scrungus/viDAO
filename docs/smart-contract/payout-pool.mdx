@@ -1,0 +1,107 @@
+---
+title: "PayoutPool contract"
+description: "The Stylus contract that holds subscription USDC and distributes it to creators."
+---
+
+`PayoutPool` is the on-chain core of viDAO. It holds USDC and lets the owner distribute it to creators proportionally by weighted watch hours. The source is `contracts/contracts/stylus/payout-pool/src/lib.rs` — written in Rust, compiled to WASM, deployed on Arbitrum Sepolia.
+
+## Storage
+
+```rust
+sol_storage! {
+    #[entrypoint]
+    pub struct PayoutPool {
+        address owner;
+        address usdc_token;
+        bool initialized;
+    }
+}
+```
+
+Only three slots. Notably **there is no `pool_balance` slot** — the live balance is computed from the USDC contract at read time. See [live balance](/smart-contract/live-balance) for the rationale.
+
+## Custom errors
+
+```rust
+error NotOwner();
+error AlreadyInitialized();
+error NotInitialized();
+error InsufficientPool(uint256 requested, uint256 available);
+error LengthMismatch();
+error TransferFailed();
+error ZeroAmount();
+```
+
+## Public functions
+
+### `initialize(usdc_token: Address)`
+
+One-shot constructor. Sets `owner = msg.sender` and records the USDC token address. Reverts with `AlreadyInitialized` on re-entry.
+
+### `deposit(amount: U256)`
+
+Pulls `amount` USDC from `msg.sender` via `transferFrom`. Caller must have approved this contract first. Reverts with `ZeroAmount` if `amount == 0`, and with `TransferFailed` if the ERC20 call returns `false`.
+
+<Note>
+Depositing via this entrypoint is optional. Funds sent directly to the contract via `transfer` count equally, because `pool_balance()` reads live from the ERC20. The entrypoint exists mainly for a cleaner audit trail.
+</Note>
+
+### `distribute(creators: Vec<Address>, amounts: Vec<U256>)`
+
+Owner-only. The main payout call. Behaviour:
+
+1. Reverts `NotInitialized` if `initialize` has not been called.
+2. Reverts `NotOwner` if `msg.sender != owner`.
+3. Reverts `LengthMismatch` if the two arrays differ in length.
+4. Sums `amounts` into `total`.
+5. Reads live `balance_of(self)` from the USDC contract.
+6. Reverts `InsufficientPool { requested, available }` if `total > balance`.
+7. Calls `usdc.transfer(creators[i], amounts[i])` for each `i` where `amounts[i] > 0`.
+8. Reverts `TransferFailed` if any individual transfer returns `false`.
+
+Zero-amount entries are skipped rather than rejected, so the caller can pass a sparse array. The entire call is one atomic transaction — any failure reverts every transfer.
+
+### `pool_balance() -> U256`
+
+View function. Reads `IERC20(usdc_token).balanceOf(self)` and returns it.
+
+```rust
+pub fn pool_balance(&self) -> Result<U256, Vec<u8>> {
+    let usdc = IERC20::new(self.usdc_token.get());
+    let this = self.vm().contract_address();
+    let ctx = Call::new();
+    Ok(usdc.balance_of(self.vm(), ctx, this)?)
+}
+```
+
+### `owner() -> Address`, `usdc_token() -> Address`
+
+View accessors for the stored addresses.
+
+## Calling from off-chain
+
+The ABI and Viem clients are exported from `apps/web/src/lib/contract.ts`:
+
+```ts
+import { publicClient, getWalletClient, PAYOUT_POOL_ABI, PAYOUT_POOL_ADDRESS } from "@/lib/contract";
+
+const balance = await publicClient.readContract({
+  address: PAYOUT_POOL_ADDRESS,
+  abi: PAYOUT_POOL_ABI,
+  functionName: "pool_balance",
+});
+```
+
+The server-side wallet client (used by the payout cron) is instantiated on demand via `getWalletClient()`, which requires `DEPLOYER_PRIVATE_KEY` in the environment.
+
+## Tests
+
+Hardhat integration tests live in `contracts/test/PayoutPool.test.ts`. Run them with:
+
+```bash
+npx hardhat test nodejs
+```
+
+<Warning>
+Use `npx hardhat test nodejs`, not `npx hardhat test`. See [testing](/runbooks/testing) for why.
+</Warning>

@@ -1,0 +1,254 @@
+---
+title: "PayoutPool Contract: ABI and Integration Reference"
+description: "Full ABI, function signatures, custom errors, and ethers.js / viem examples for the PayoutPool USDC distribution contract on Arbitrum Sepolia."
+---
+
+PayoutPool is a Rust smart contract compiled to WASM via the [Arbitrum Stylus](https://docs.arbitrum.io/stylus/stylus-gentle-introduction) toolchain. It holds USDC deposited from subscriber payments and distributes that USDC to creators, proportionally by their verified watch hours, via a weekly payout cron. The contract is currently deployed on **Arbitrum Sepolia** (testnet). Mainnet deployment on Arbitrum One is planned for after the MVP validation phase.
+
+The contract exposes three mutating functions and three view functions, all callable through the standard EVM ABI. You can interact with it using ethers.js, viem, wagmi, or any EVM-compatible tool.
+
+<Note>
+  The `distribute()` function is restricted to the contract owner and is called automatically by the StreamDAO payout cron. You do not need to call it directly. The functions most relevant to external integrations are `deposit()` and the three view functions.
+</Note>
+
+## ABI
+
+```json
+[
+  { "type": "function", "name": "initialize", "inputs": [{ "name": "usdc_token", "type": "address" }], "outputs": [], "stateMutability": "nonpayable" },
+  { "type": "function", "name": "deposit", "inputs": [{ "name": "amount", "type": "uint256" }], "outputs": [], "stateMutability": "nonpayable" },
+  { "type": "function", "name": "distribute", "inputs": [{ "name": "creators", "type": "address[]" }, { "name": "amounts", "type": "uint256[]" }], "outputs": [], "stateMutability": "nonpayable" },
+  { "type": "function", "name": "pool_balance", "inputs": [], "outputs": [{ "type": "uint256" }], "stateMutability": "view" },
+  { "type": "function", "name": "owner", "inputs": [], "outputs": [{ "type": "address" }], "stateMutability": "view" },
+  { "type": "function", "name": "usdc_token", "inputs": [], "outputs": [{ "type": "address" }], "stateMutability": "view" }
+]
+```
+
+---
+
+## Functions
+
+### `initialize(usdc_token)`
+
+One-time setup. Sets the contract owner to the caller (`msg.sender`) and configures the USDC token address. Can only be called once — subsequent calls revert with `AlreadyInitialized`.
+
+<ParamField body="usdc_token" type="address" required>
+  The ERC-20 USDC token contract address on Arbitrum Sepolia. This cannot be changed after initialization.
+</ParamField>
+
+---
+
+### `deposit(amount)`
+
+Deposits USDC from the caller's wallet into the pool. Before calling `deposit`, you must approve the PayoutPool contract to spend at least `amount` USDC on your behalf by calling `approve(payoutPoolAddress, amount)` on the USDC contract.
+
+<ParamField body="amount" type="uint256" required>
+  The amount of USDC to deposit, in the token's base unit (USDC has 6 decimals, so `1_000_000` = 1 USDC). Must be greater than zero.
+</ParamField>
+
+Reverts with `ZeroAmount` if `amount` is `0`, `NotInitialized` if the contract has not been initialized, or `TransferFailed` if the ERC-20 `transferFrom` call returns false.
+
+---
+
+### `distribute(creators, amounts)` — owner only
+
+Transfers USDC from the pool to a list of creator addresses. Called by the platform payout cron. Reverts with `NotOwner` if called by any address other than the owner.
+
+<ParamField body="creators" type="address[]" required>
+  Ordered list of creator wallet addresses to receive payouts.
+</ParamField>
+
+<ParamField body="amounts" type="uint256[]" required>
+  Ordered list of USDC amounts (6-decimal base units) corresponding to each address in `creators`. Must be the same length as `creators`. The sum of all amounts must not exceed the current `pool_balance`.
+</ParamField>
+
+---
+
+### `pool_balance()` → `uint256`
+
+Returns the current USDC balance held by the contract, in 6-decimal base units.
+
+---
+
+### `owner()` → `address`
+
+Returns the address of the contract owner (the deployer who called `initialize`).
+
+---
+
+### `usdc_token()` → `address`
+
+Returns the USDC ERC-20 token address configured during initialization.
+
+---
+
+## Custom errors
+
+| Error | Selector | Description |
+|-------|----------|-------------|
+| `NotOwner()` | — | Caller is not the contract owner. Thrown by `distribute`. |
+| `AlreadyInitialized()` | — | `initialize` has already been called. |
+| `NotInitialized()` | — | `deposit` or `distribute` called before `initialize`. |
+| `InsufficientPool(uint256 requested, uint256 available)` | — | Sum of `amounts` in `distribute` exceeds `pool_balance`. Includes both the requested total and actual available balance. |
+| `LengthMismatch()` | — | `creators` and `amounts` arrays passed to `distribute` have different lengths. |
+| `TransferFailed()` | — | An ERC-20 `transferFrom` or `transfer` call returned `false`. |
+| `ZeroAmount()` | — | `deposit` was called with `amount = 0`. |
+
+---
+
+## Code examples
+
+### Reading `pool_balance()`
+
+<CodeGroup>
+```ts ethers.js v6
+import { ethers } from 'ethers';
+
+const PAYOUT_POOL_ADDRESS = '0xYourPayoutPoolAddress';
+const PAYOUT_POOL_ABI = [
+  'function pool_balance() view returns (uint256)',
+  'function usdc_token() view returns (address)',
+  'function owner() view returns (address)',
+];
+
+const provider = new ethers.JsonRpcProvider('https://sepolia-rollup.arbitrum.io/rpc');
+const contract = new ethers.Contract(PAYOUT_POOL_ADDRESS, PAYOUT_POOL_ABI, provider);
+
+const rawBalance = await contract.pool_balance();
+// USDC has 6 decimals
+const usdcBalance = Number(rawBalance) / 1_000_000;
+console.log(`Pool balance: ${usdcBalance} USDC`);
+```
+
+```ts viem
+import { createPublicClient, http, formatUnits } from 'viem';
+import { arbitrumSepolia } from 'viem/chains';
+
+const PAYOUT_POOL_ADDRESS = '0xYourPayoutPoolAddress' as `0x${string}`;
+
+const client = createPublicClient({
+  chain: arbitrumSepolia,
+  transport: http(),
+});
+
+const rawBalance = await client.readContract({
+  address: PAYOUT_POOL_ADDRESS,
+  abi: [
+    {
+      name: 'pool_balance',
+      type: 'function',
+      stateMutability: 'view',
+      inputs: [],
+      outputs: [{ type: 'uint256' }],
+    },
+  ],
+  functionName: 'pool_balance',
+});
+
+const usdcBalance = formatUnits(rawBalance, 6);
+console.log(`Pool balance: ${usdcBalance} USDC`);
+```
+</CodeGroup>
+
+---
+
+### Depositing USDC
+
+You must approve the PayoutPool contract before depositing. This requires two transactions: one `approve` on the USDC contract, then one `deposit` on the PayoutPool.
+
+<CodeGroup>
+```ts ethers.js v6
+import { ethers } from 'ethers';
+
+const PAYOUT_POOL_ADDRESS = '0xYourPayoutPoolAddress';
+const USDC_ADDRESS = '0xYourUsdcAddress'; // USDC on Arbitrum Sepolia
+
+const USDC_ABI = [
+  'function approve(address spender, uint256 amount) returns (bool)',
+];
+const PAYOUT_POOL_ABI = [
+  'function deposit(uint256 amount)',
+];
+
+// Assumes `signer` is an ethers Signer (e.g. from a browser wallet)
+const usdc = new ethers.Contract(USDC_ADDRESS, USDC_ABI, signer);
+const pool = new ethers.Contract(PAYOUT_POOL_ADDRESS, PAYOUT_POOL_ABI, signer);
+
+const depositAmount = ethers.parseUnits('10', 6); // 10 USDC
+
+// Step 1: approve the pool to spend your USDC
+const approveTx = await usdc.approve(PAYOUT_POOL_ADDRESS, depositAmount);
+await approveTx.wait();
+
+// Step 2: deposit into the pool
+const depositTx = await pool.deposit(depositAmount);
+await depositTx.wait();
+
+console.log('Deposit confirmed:', depositTx.hash);
+```
+
+```ts viem
+import { createWalletClient, createPublicClient, http, parseUnits } from 'viem';
+import { arbitrumSepolia } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+
+const PAYOUT_POOL_ADDRESS = '0xYourPayoutPoolAddress' as `0x${string}`;
+const USDC_ADDRESS = '0xYourUsdcAddress' as `0x${string}`;
+
+const account = privateKeyToAccount('0xYourPrivateKey');
+
+const walletClient = createWalletClient({
+  account,
+  chain: arbitrumSepolia,
+  transport: http(),
+});
+const publicClient = createPublicClient({
+  chain: arbitrumSepolia,
+  transport: http(),
+});
+
+const depositAmount = parseUnits('10', 6); // 10 USDC
+
+// Step 1: approve
+const approveHash = await walletClient.writeContract({
+  address: USDC_ADDRESS,
+  abi: [{ name: 'approve', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ type: 'bool' }] }],
+  functionName: 'approve',
+  args: [PAYOUT_POOL_ADDRESS, depositAmount],
+});
+await publicClient.waitForTransactionReceipt({ hash: approveHash });
+
+// Step 2: deposit
+const depositHash = await walletClient.writeContract({
+  address: PAYOUT_POOL_ADDRESS,
+  abi: [{ name: 'deposit', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'amount', type: 'uint256' }], outputs: [] }],
+  functionName: 'deposit',
+  args: [depositAmount],
+});
+await publicClient.waitForTransactionReceipt({ hash: depositHash });
+
+console.log('Deposit confirmed:', depositHash);
+```
+</CodeGroup>
+
+---
+
+## Network details
+
+| Property | Value |
+|----------|-------|
+| Network | Arbitrum Sepolia |
+| Chain ID | `421614` |
+| RPC | `https://sepolia-rollup.arbitrum.io/rpc` |
+| Explorer | `https://sepolia.arbiscan.io` |
+| USDC (testnet) | Bridged USDC on Arbitrum Sepolia |
+
+<Warning>
+  The contract is deployed on Arbitrum Sepolia. Transactions use testnet ETH for gas and testnet USDC — no real funds are involved during the MVP phase. Do not send mainnet assets to the Sepolia contract address.
+</Warning>
+
+## Implementation notes
+
+The contract is written in Rust and compiled to WASM using the `stylus-sdk` crate. It conforms to the standard EVM ABI, so any tool that can interact with Ethereum smart contracts can interact with PayoutPool — no Stylus-specific tooling is required on the client side.
+
+The `distribute()` function is called automatically by the StreamDAO weekly payout job. It computes each creator's proportional share of the pool from verified watch hours and submits a single transaction with all creator addresses and amounts. The transaction hash is surfaced in each creator's dashboard for on-chain verification.

@@ -1,0 +1,97 @@
+---
+title: "Subscription Webhook — POST /api/subscription/webhook"
+description: "Transak calls this endpoint when a subscription payment completes. Verifies the JWT payload and activates a 30-day subscription for the paying wallet address."
+---
+
+The subscription webhook is called by [Transak](https://transak.com) — not by your application code directly. When a user completes a fiat-to-USDC subscription purchase through the Transak widget, Transak sends an `ORDER_COMPLETED` event to this endpoint. StreamDAO verifies the JWT payload and activates a 30-day subscription for the wallet address associated with the order.
+
+<Note>
+  If you are integrating StreamDAO and need to configure Transak, set the webhook URL in your Transak dashboard to `https://your-streamdao-instance.com/api/subscription/webhook`. This endpoint is not intended to be called by user-facing clients.
+</Note>
+
+## Request
+
+```
+POST /api/subscription/webhook
+Content-Type: application/json
+```
+
+No session cookie is required. The payload is authenticated via JWT signature using the shared secret configured between Transak and your StreamDAO deployment.
+
+<ParamField body="data" type="string" required>
+  A JWT-encoded string containing the order payload. The JWT is signed with your `TRANSAK_ACCESS_TOKEN`. The server decodes and verifies this token before processing any order data.
+</ParamField>
+
+<ParamField body="eventID" type="string" required>
+  The Transak event type. Currently, only `ORDER_COMPLETED` triggers a subscription activation. All other event types are acknowledged with `200` but no action is taken.
+</ParamField>
+
+## JWT payload
+
+After verifying the JWT signature, the server reads the following fields from the decoded payload:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `walletAddress` | `string` | The user's wallet address. Used to look up the StreamDAO user record. |
+| `id` | `string` | The Transak order ID. Logged for debugging. |
+
+The full Transak order object may contain additional fields. StreamDAO only reads `walletAddress` and `id`.
+
+### Decoded JWT example
+
+```json
+{
+  "webhookData": {
+    "id": "txn_abc123def456",
+    "walletAddress": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+    "status": "COMPLETED",
+    "fiatAmount": 10,
+    "fiatCurrency": "USD",
+    "cryptoAmount": 9.94,
+    "cryptoCurrency": "USDC",
+    "network": "arbitrum"
+  },
+  "eventID": "ORDER_COMPLETED",
+  "iat": 1712800000
+}
+```
+
+## Supported events
+
+| eventID | Action |
+|---------|--------|
+| `ORDER_COMPLETED` | Looks up the user by `walletAddress` and sets `subscribedUntil` to 30 days from now. |
+| Any other value | Returns `200 { "ok": true }` with no state change. |
+
+<Warning>
+  If no StreamDAO user record is found for the `walletAddress` in an `ORDER_COMPLETED` event, the webhook returns `200` with no subscription activated. Ensure users complete the registration flow (including wallet association via Privy) before initiating a Transak payment.
+</Warning>
+
+## Response
+
+The endpoint always returns `HTTP 200` to prevent Transak from retrying delivery:
+
+<ResponseField name="ok" type="boolean">
+  Always `true`. A successful `200` response means the webhook was received and processed — it does not necessarily mean a subscription was activated (the wallet may not have matched a user record).
+</ResponseField>
+
+```json
+{
+  "ok": true
+}
+```
+
+## Full webhook payload example
+
+This is the raw JSON body Transak sends to the endpoint:
+
+```json
+{
+  "data": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ3ZWJob29rRGF0YSI6eyJpZCI6InR4bl9hYmMxMjNkZWY0NTYiLCJ3YWxsZXRBZGRyZXNzIjoiMHhkOGRBNkJGMjY5NjRhRjlEN0VFZDllMDNFNTM0MTVEMzdhQTk2MDQ1Iiwic3RhdHVzIjoiQ09NUExFVEVEIn0sImV2ZW50SUQiOiJPUkRFUl9DT01QTEVURUQiLCJpYXQiOjE3MTI4MDAwMDB9.SIGNATURE",
+  "eventID": "ORDER_COMPLETED"
+}
+```
+
+## On-chain note
+
+The webhook activates the subscription in the StreamDAO database. USDC from the payment is deposited into the PayoutPool contract separately — Transak sends USDC directly to the pool wallet, and the payout cron handles the smart contract `deposit()` call. See the [PayoutPool Contract](/api/payout-pool-contract) reference for details on how pool deposits work.

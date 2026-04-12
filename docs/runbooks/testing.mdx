@@ -1,0 +1,71 @@
+---
+title: "Testing"
+description: "Running the web and contract test suites."
+---
+
+## Web app
+
+Type checking via the Next.js build:
+
+```bash
+cd apps/web
+npm run build
+```
+
+Lint:
+
+```bash
+npm run lint
+```
+
+There is no Vitest/Jest unit suite in the MVP yet. Type checking and linting are the ground truth until one is added.
+
+## Smart contract
+
+The contract is tested via Hardhat integration tests in `contracts/test/PayoutPool.test.ts`. These spin up the Arbitrum devnode, deploy the contract, and exercise `initialize`, `deposit`, `distribute`, `pool_balance`, and the revert paths.
+
+Run them with:
+
+```bash
+cd contracts
+npx hardhat test nodejs
+```
+
+<Warning>
+Use `npx hardhat test nodejs`, **not** `npx hardhat test`.
+
+Plain `npx hardhat test` runs Hardhat's solidity-test harness, which currently fails with `HHE100 — An internal invariant was violated: buildInfoId should not be undefined for artifact: 'payout-pool'`. The root cause is that `@cobuilders/hardhat-arbitrum-stylus` writes WASM artifacts without the `buildInfoId` field that Hardhat 3's solidity-test runner expects.
+
+Passing `nodejs` selects the Node.js Mocha runner instead, which is the path the Stylus plugin actually supports. All ten tests pass on this path.
+</Warning>
+
+## Before running contract tests
+
+The devnode must be up:
+
+```bash
+cd contracts
+npm run node:start
+npm run node:status   # should say "running"
+```
+
+If you get "short-name did not resolve to an alias" while starting the devnode via Podman, create `~/.config/containers/registries.conf` with:
+
+```ini
+unqualified-search-registries = ["docker.io"]
+```
+
+See [local development](/runbooks/local-dev) for the full Podman/Docker wrapper setup.
+
+## What the contract tests cover
+
+From `contracts/test/PayoutPool.test.ts`:
+
+- `initialize` succeeds once, reverts on re-entry with `AlreadyInitialized`.
+- `deposit` requires prior `approve`, pulls USDC, and reverts on `ZeroAmount`.
+- `distribute` reverts `NotOwner` for non-owner callers.
+- `distribute` reverts `LengthMismatch` on unequal arrays.
+- `distribute` reverts `InsufficientPool` when the request exceeds the live balance.
+- `distribute` transfers to each creator in one transaction, zero-amount entries skipped.
+- `pool_balance()` reflects live ERC20 balance — including funds sent via direct ERC20 `transfer` that bypass `deposit`.
+- `owner()` and `usdc_token()` accessors return the values set at initialisation.

@@ -1,0 +1,45 @@
+---
+title: "Tech stack"
+description: "What's running, and why it was picked for the MVP."
+---
+
+The MVP picks pragmatic tools over ambitious ones. Anything decentralised that would slow down iteration was deferred.
+
+| Layer | Choice | Notes |
+|---|---|---|
+| Frontend | Next.js 16 (App Router) | React 19. Server Components where useful. |
+| Database | Postgres via Prisma v7 | Uses the `@prisma/adapter-pg` driver. |
+| Auth | Privy (`@privy-io/react-auth` + `@privy-io/server-auth`) | Embedded wallet, email sign-in, WebAuthn passkey linking. |
+| Device attestation | WebAuthn via Privy's `useLinkWithPasskey` | Hardware-vs-software is a flag on the `User` row. |
+| Fiat on-ramp | Transak | Webhook delivers a JWT encrypted with the access token. A local mock exists for dev. |
+| Video storage | Local disk (`VIDEO_UPLOAD_DIR`) | Served by Next.js. Cloudflare Stream is deferred. |
+| Thumbnails | `ffmpeg` subprocess | Best-effort; upload succeeds even if thumbnail generation fails. |
+| L2 blockchain | Arbitrum Sepolia (testnet) | Via Viem (`arbitrumSepolia` chain). |
+| Smart contract language | Rust (Arbitrum Stylus) | Not Solidity. Compiled to WASM. |
+| Contract tooling | Hardhat 3 + `@cobuilders/hardhat-arbitrum-stylus` | Run tests via `npx hardhat test nodejs`. |
+| Stablecoin | USDC | Deposited and distributed by the `PayoutPool` contract. |
+| Styling | Tailwind v4 + Tailwind PostCSS plugin | Dark theme matches the docs site. |
+| Package manager | npm workspaces | Monorepo split into `apps/web` and `contracts`. |
+
+## Deltas from the original vision
+
+`viDAO.md` is the long-term product plan, which names Solidity, Cloudflare Stream, Livepeer, and IPFS. The MVP swapped these out to move faster:
+
+- **Stylus over Solidity** — single-language stack with the web app (Rust shares idioms with TypeScript more gracefully than Solidity), and Stylus gives us cheap gas on Arbitrum without rewriting.
+- **Local disk over Cloudflare Stream / Livepeer** — eliminates an external service for local dev. Re-evaluated when a CDN actually matters.
+- **No IPFS** — thumbnails and metadata live in Postgres and on disk. Decentralisation moves to the economics layer, not delivery.
+- **No merkle payout claims yet** — the cron pushes directly via owner-gated `distribute`. Merkle commitments are a Phase 6+ concern.
+
+## Versions
+
+Pinned in the two `package.json` files:
+
+- `next@16.2.3`, `react@19.2.4`
+- `prisma@^7.7.0`, `@prisma/client@^7.7.0`
+- `viem@^2.47.4`
+- `hardhat@^3.3.0`
+- `@cobuilders/hardhat-arbitrum-stylus@^0.0.1-alpha.21`
+
+<Warning>
+Next.js 16 has breaking changes from the versions most tooling was trained on. When unsure about a Next.js API, read the vendored docs under `apps/web/node_modules/next/dist/docs/` before writing code.
+</Warning>

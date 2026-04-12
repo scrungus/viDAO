@@ -1,0 +1,79 @@
+---
+title: "How Device Verification Works on StreamDAO"
+description: "A one-time browser prompt proves you're on real hardware so your watch time counts toward creator payouts. Here's what it does and which devices qualify."
+---
+
+When you sign up for StreamDAO, your browser asks you to confirm your identity once using Face ID, a fingerprint, or your device PIN. This is called device verification, and it's what makes StreamDAO's creator payout system trustworthy. Without it, bots and fake sessions could flood the system and dilute what real viewers earn for creators.
+
+The prompt takes about one second and never happens again on the same device. You don't need to understand how it works — but if you're curious, here's what's actually going on.
+
+## What device verification does
+
+When you tap through the prompt, your device generates a unique key pair inside its security chip — a piece of hardware that's physically separate from the rest of the processor and designed to be tamper-resistant. The private key is created inside that chip and **never leaves it**. StreamDAO only ever sees a digital signature, not the key itself.
+
+Every 30 seconds while you're watching, the player sends a small signal signed by that key. StreamDAO verifies the signature to confirm you're still watching on the same real device. This is how your watch time is marked as genuine.
+
+<Info>
+  StreamDAO cannot access your biometrics. Face ID and fingerprint data stay on your device. The platform only receives a cryptographic signature — a string of numbers that proves your device is real, without revealing anything about you personally.
+</Info>
+
+## Why it matters for creator payouts
+
+StreamDAO distributes your subscription fee to creators based on verified watch hours. If the verification system didn't exist, someone could set up hundreds of virtual machines all pretending to watch the same creator — inflating that creator's share and taking money away from everyone else.
+
+Device verification closes that loophole. Virtual machines and software bots cannot produce a valid hardware signature, so they're excluded from the payout calculation entirely. Only real devices watching real content accumulate hours that count.
+
+## Supported devices
+
+Most phones, computers, and tablets used for streaming today support hardware-backed device verification. If your device isn't on this list, you can still watch all content — your watch time just won't count toward creator payouts.
+
+<Tabs>
+  <Tab title="iPhone / iPad">
+    **Supported:** iPhone 5s and later, iPad with Touch ID or Face ID (2013 onwards)
+
+    Apple devices use the **Secure Enclave** — a dedicated security chip built into every iPhone since 2013. Verification uses Face ID or Touch ID.
+
+    Nearly all iPhones currently in active use support this.
+  </Tab>
+  <Tab title="Android">
+    **Supported:** Android devices shipping with Android 9 or later that include a **StrongBox** chip
+
+    StrongBox is a tamper-resistant hardware security module required on all Android devices certified for Android 9+ (released 2018). Verification uses your fingerprint or screen lock PIN.
+
+    Most modern Android phones from major manufacturers (Samsung, Google Pixel, OnePlus, etc.) qualify.
+  </Tab>
+  <Tab title="Windows">
+    **Supported:** Windows 10 or later with **TPM 2.0**
+
+    TPM 2.0 (Trusted Platform Module) has been mandatory on new Windows PCs since 2016, and is required for Windows 11. Verification uses Windows Hello (fingerprint, face, or PIN).
+
+    If your PC runs Windows 11, it definitely supports this. Most Windows 10 machines from 2016 onwards do too.
+  </Tab>
+  <Tab title="Mac">
+    **Supported:** Mac with **T2 chip or Apple Silicon** (2018 onwards)
+
+    - MacBook Pro and MacBook Air from 2018+
+    - Mac mini from 2018+
+    - Mac Pro from 2019+
+    - All Macs with M1, M2, M3, or later chips
+
+    Verification uses Touch ID or your login password.
+  </Tab>
+</Tabs>
+
+## What happens if your device isn't supported
+
+You can watch everything on StreamDAO regardless of device. Device verification only affects whether your watch time counts toward creator payouts — it has no effect on playback quality, content access, or any other part of the experience.
+
+<Warning>
+  If your device doesn't support hardware verification, the time you spend watching won't be included in the creator payout calculation. You'll still enjoy the full viewing experience, but creators won't receive credit for your views.
+</Warning>
+
+If you're unsure whether your device qualifies, the easiest check is to go through sign-up — the browser will tell you during the verification step if your device isn't supported.
+
+## Your privacy
+
+- Your biometric data (fingerprint, face scan) never leaves your device
+- StreamDAO receives only a signature — a mathematical proof that your device is real, not any personal information
+- The private key is stored in hardware and cannot be extracted, exported, or transferred
+- Uninstalling your browser or resetting your device removes the key permanently — you'd register a new one on next sign-up

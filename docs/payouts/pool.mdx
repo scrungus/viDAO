@@ -1,0 +1,75 @@
+---
+title: "The StreamDAO Subscription Pool: How Funds Flow to Creators"
+description: "Where your subscription fees go, how the USDC pool is held on-chain, and how funds are distributed to creators each week via the PayoutPool contract."
+---
+
+Every subscription payment on StreamDAO feeds into a single shared pool — a smart contract on the Arbitrum network that holds USDC until the weekly payout runs. The pool is the financial heart of the platform: transparent, on-chain, and governed by simple rules rather than editorial decisions.
+
+## What the pool is
+
+The subscription pool is a smart contract called `PayoutPool`, written in Rust and deployed on Arbitrum. It holds one thing: USDC collected from subscriber payments during the current billing period. The contract has two core functions — `deposit()` to receive funds, and `distribute()` to send them to creators — and that's intentionally all it does.
+
+The pool balance is publicly visible on-chain at all times. You don't have to trust StreamDAO's dashboard figures; you can query the contract directly.
+
+<Info>
+  The pool currently runs on Arbitrum Sepolia (testnet) during the MVP phase. The contract address for Arbitrum One mainnet will be published here at launch.
+</Info>
+
+## How funds enter the pool
+
+When you complete a subscription payment, your card charge is converted to USDC in the background and the platform calls `deposit()` on the PayoutPool contract. The USDC transfers from the platform's payment wallet into the contract, and the pool balance increases by that amount.
+
+The deposit happens automatically on every successful subscription payment — including renewals. You never interact with the contract directly.
+
+<Note>
+  Approximately 5% of each subscription is retained as a protocol fee before deposit. The remainder — roughly 95% — goes into the pool for creator payouts.
+</Note>
+
+## How funds leave the pool
+
+Once a week, StreamDAO's payout system calculates each creator's proportional share of verified watch hours and calls `distribute()` on the contract. The contract:
+
+1. Verifies the caller is authorised (the payout system wallet)
+2. Confirms the total payout doesn't exceed the current pool balance
+3. Transfers USDC directly to each creator's wallet address
+4. Updates the pool balance to reflect what was distributed
+
+Every `distribute()` call produces an on-chain transaction with a hash that anyone can look up on the Arbitrum block explorer.
+
+## The monthly reset
+
+The pool aligns with the monthly subscription billing cycle. At the end of each billing period, the pool resets — the next month's subscriptions start building a fresh pool from zero.
+
+This design has a deliberate consequence: **unused pool balance does not roll over**. All funds collected in a given month are distributed to creators in that month's weekly payouts. The maximum amount at risk in the contract at any point is approximately one month of total subscription revenue.
+
+<Warning>
+  If you're a creator and you miss a payout period due to account issues or a disconnected wallet, contact support promptly. Unclaimed funds from a period are distributed with the rest and cannot be retroactively recovered after the pool resets.
+</Warning>
+
+## Transparency and verification
+
+Because the pool lives on-chain, several things are independently verifiable right now:
+
+- **Pool balance** — query `pool_balance()` on the contract at any time
+- **Deposit history** — every subscription payment produces an on-chain deposit transaction
+- **Distribution history** — every weekly payout produces an on-chain distribution transaction with individual creator transfer amounts
+
+Creator payout records in the StreamDAO dashboard include the transaction hash for each weekly distribution, so you can verify your payment on-chain without relying solely on the dashboard.
+
+## What's coming after launch
+
+<Info>
+  **Post-MVP:** StreamDAO plans to commit a merkle root of all creator engagement scores on-chain alongside each weekly distribution. This will allow creators to independently verify that their watch hours were correctly included in the payout calculation — using a cryptographic proof, without needing to trust the platform's server-side numbers. The engagement scoring logic will also be published as open source.
+</Info>
+
+## Summary
+
+| | |
+|---|---|
+| What the pool holds | USDC from subscriber payments |
+| Where it lives | PayoutPool smart contract on Arbitrum |
+| How funds enter | `deposit()` called on each successful subscription payment |
+| How funds leave | `distribute()` called weekly, proportional to verified watch hours |
+| Reset frequency | Monthly, aligned with billing cycle |
+| Protocol fee | ~5% retained before deposit |
+| Balance visibility | Publicly queryable on-chain at any time |

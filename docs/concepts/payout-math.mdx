@@ -1,0 +1,87 @@
+---
+title: "Payout math"
+description: "How weighted watch seconds become on-chain USDC transfers."
+---
+
+The payout cron at `apps/web/src/server/payout-cron.ts` is the code path that turns `WatchSession.weightedSeconds` into on-chain USDC transfers.
+
+## When it runs
+
+`runPayoutCron(periodStart, periodEnd)` is called from `POST /api/cron/payout`, which is guarded by a `CRON_SECRET` bearer token. Without the secret, the endpoint returns 401. With the wrong secret, also 401.
+
+The function accepts an optional window. If omitted, it infers "the last week" from the timestamp range of sessions that have not been processed yet.
+
+## The aggregation
+
+```text
+                     ┌─────────────────────────────┐
+                     │  WatchSession rows in       │
+                     │  [periodStart, periodEnd]   │
+                     │  where weightedSeconds > 0  │
+                     └─────────────┬───────────────┘
+                                   │ group by video.creatorId
+                                   ▼
+                     ┌─────────────────────────────┐
+                     │  creatorSeconds: Map<       │
+                     │    creatorId → seconds      │
+                     │  >                          │
+                     └─────────────┬───────────────┘
+                                   │ sum all values
+                                   ▼
+                            totalSeconds
+```
+
+Sessions with `weightedSeconds = 0` are excluded up front — they cost nothing and represent non-attested or capped viewers.
+
+## The formula
+
+For each creator with wallet address and non-zero seconds:
+
+```text
+amount = (poolBalance * creatorSeconds) / totalSeconds
+```
+
+All arithmetic is done in USDC base units (6 decimals). `poolBalance` is read live from the on-chain contract via `publicClient.readContract({ functionName: "pool_balance" })`. The division truncates toward zero, so the last satoshi of rounding dust stays in the pool for next period.
+
+## Skip conditions
+
+The cron skips distribution (but still writes a `PayoutPeriod` row) when any of these hold:
+
+- No `WatchSession` rows in the window with `weightedSeconds > 0`.
+- `totalSeconds === 0n`.
+- `poolBalance === 0n`.
+- No creators with wallet addresses after aggregation.
+
+In skip cases, the row is written with `status = PENDING` and no `txHash`, and the function returns early.
+
+## The on-chain call
+
+If `DEPLOYER_PRIVATE_KEY` is set in the environment, the cron instantiates a `walletClient` and calls `distribute(creators, amounts)` on the `PayoutPool` contract. On success, each `CreatorPayout` row gets the same `txHash` (the single distribute transaction) and `status = DISTRIBUTED`.
+
+If `DEPLOYER_PRIVATE_KEY` is not set, the cron logs a warning and writes `CreatorPayout` rows with `status = PENDING` and no `txHash`. This is the normal state in local dev.
+
+## Rounding behaviour
+
+BigInt division truncates. If 3 creators split a £100 pool in 15/10/5 hour proportions:
+
+- Alice: `(100e6 * 15) / 30 = 50_000_000` → 50.000000 USDC
+- Bob: `(100e6 * 10) / 30 = 33_333_333` → 33.333333 USDC
+- Carol: `(100e6 * 5) / 30 = 16_666_666` → 16.666666 USDC
+
+The remaining 1 base unit (0.000001 USDC) stays in the pool. Over the course of many weeks this is negligible — typically well under £0.01 accumulated drift.
+
+## What gets written to the database
+
+One `PayoutPeriod` per run, with:
+
+- `periodStart`, `periodEnd`, `totalPoolUsdc` (as a decimal float, for display)
+- `status` — `DISTRIBUTED` if the on-chain call succeeded, `PENDING` otherwise
+
+One `CreatorPayout` per creator with non-zero seconds, with:
+
+- `watchHours` — the creator's total hours in the period
+- `sharePercentage` — `watchHours / totalHours`
+- `usdcAmount` — the value passed to `distribute`, converted back to a float for display
+- `txHash` — the distribution transaction hash, if one was sent
+
+The creator dashboard reads these rows in reverse chronological order.

@@ -1,0 +1,103 @@
+---
+title: "How StreamDAO's Subscription and Payout Model Works"
+description: "Follow the money: how your monthly subscription becomes creator earnings — from card payment to verified watch hours to weekly USDC payouts, step by step."
+---
+
+StreamDAO's economic model is straightforward: subscribers pay in, creators earn out, in proportion to how much time viewers genuinely spend watching their content. The platform's job is to make that flow trustworthy and tamper-resistant. This page explains each step of that journey — from the moment you subscribe to the moment a creator receives their weekly payout.
+
+## The full flow
+
+<Steps>
+  <Step title="You subscribe — your fee enters the pool">
+    When you subscribe, you pay a flat monthly fee by card. Behind the scenes, that payment is converted to USDC — a digital dollar that doesn't fluctuate in value — and deposited into a shared pool. You never see this happen; from your perspective you've just signed up.
+
+    After the 5% protocol fee (which covers infrastructure costs), the remaining 95% of every subscriber's fee sits in the pool waiting to be distributed to creators at the end of the week.
+
+    <Info>
+      The pool is held in a smart contract — a self-executing piece of code on the Arbitrum blockchain. No single person, including StreamDAO, can move those funds arbitrarily. The contract releases money only when the weekly distribution rules are met.
+    </Info>
+  </Step>
+
+  <Step title="Your device is verified once, at sign-up">
+    When you create your account, your browser asks for a fingerprint, Face ID, or PIN. This is a standard security step called WebAuthn — the same technology used by banking apps and password managers.
+
+    Your device uses this to generate a unique security key inside a protected chip — called the Secure Enclave on Apple devices, StrongBox on Android, and TPM on Windows PCs. The private part of that key never leaves the chip. This matters because it means your device can prove to StreamDAO's servers that it is a genuine physical device — not a bot, a virtual machine, or a script running in the cloud.
+
+    <Note>
+      This happens once per device. You won't be asked again while watching. Most modern devices support this — iPhones from 2013 onwards, Android phones from 2018 onwards, and Windows 10 PCs with TPM 2.0 (which has been standard since 2016).
+    </Note>
+  </Step>
+
+  <Step title="Heartbeats verify your watch time during playback">
+    While you're watching, the video player quietly sends a small signal to StreamDAO's servers every 30 seconds. This signal — called a heartbeat — is automatically signed by your device's security chip. It's invisible to you; playback continues normally.
+
+    Each heartbeat tells the server: "This specific, verified physical device is actively watching right now." The server checks the signature, confirms your subscription is active, and adds 30 seconds to your tally of verified watch hours.
+
+    If you pause, switch to a different tab, or walk away, the gap between heartbeats grows too large and those intervals aren't counted. Watch time only accumulates when you're genuinely present and watching.
+
+    <Tip>
+      Your watch history and recommendations still work normally even when time isn't counting toward the pool — for instance, if you've reached the monthly cap. The cap only affects creator earnings weight, not your experience as a viewer.
+    </Tip>
+  </Step>
+
+  <Step title="Watch hours are capped at 50 per month">
+    Each subscriber can contribute up to 50 verified hours of engagement weight per calendar month. You can watch as much content as you like beyond that — your history, recommendations, and playback are all unaffected — but only the first 50 hours count toward how the pool is divided.
+
+    This cap exists to keep the system fair. Without it, someone running a large number of devices could accumulate a disproportionate amount of pool weight relative to what they paid in. At 50 hours, the economics of that kind of manipulation don't work out.
+
+    <Info>
+      The average genuine viewer watches around 40 hours of streaming content per month — so the 50-hour cap doesn't affect most people at all.
+    </Info>
+  </Step>
+
+  <Step title="Creators receive their share each week">
+    Every week, StreamDAO tallies all the verified watch hours from all subscribers across all creators. Each creator's share of the pool is proportional to the fraction of total watch hours their content received.
+
+    If all creators' content generated 10,000 verified watch hours in a week, and one creator's videos accounted for 1,000 of those hours, that creator receives 10% of the pool for that period — automatically, in USDC, to their wallet.
+
+    Creators can see a breakdown in their dashboard: total earnings, watch hours by video, and their share percentage for each period.
+  </Step>
+</Steps>
+
+## Why hardware attestation stops gaming
+
+The biggest risk to a system like this is fake engagement — bots or device farms watching content to inflate a creator's share. StreamDAO's defence against this is hardware attestation.
+
+<CardGroup cols={2}>
+  <Card title="Virtual machines and bots are blocked outright" icon="robot">
+    Software running in a virtual machine or headless browser cannot produce a valid hardware attestation signature. These sessions are silently excluded from pool weight. A bot can watch, but it cannot earn.
+  </Card>
+  <Card title="Real device farms are too expensive" icon="microchip">
+    Running a farm of genuine attested devices — each costing £200–500 — to manipulate pool weights costs far more than it could ever return from the pool. The maths don't add up.
+  </Card>
+  <Card title="AFK farming is blocked by active session checks" icon="person-walking-arrow-right">
+    Heartbeats are only credited during active sessions. Backgrounded tabs, idle screens, and paused video all break the chain. You have to actually be watching.
+  </Card>
+  <Card title="The 50-hour cap limits returns per device" icon="clock">
+    Even if someone had attested devices, the monthly cap limits how much pool weight any single device can generate. The potential gain per device is bounded and small.
+  </Card>
+</CardGroup>
+
+<Warning>
+  Devices that don't support hardware attestation — very old phones or some older laptops — can still watch all content on StreamDAO. However, their watch time does not contribute to the pool distribution. Only hardware-attested sessions count toward creator payouts.
+</Warning>
+
+## What the pool looks like in practice
+
+The table below illustrates how a pool would split across three creators in a given week:
+
+| Creator | Verified watch hours | Pool share | Payout (from £1,000 pool) |
+|---|---|---|---|
+| Creator A | 500 hrs | 50% | £500 |
+| Creator B | 300 hrs | 30% | £300 |
+| Creator C | 200 hrs | 20% | £200 |
+
+The numbers above are illustrative. The actual pool size depends on how many subscribers are active that month, and shares shift week to week as viewing patterns change.
+
+## A note on transparency
+
+StreamDAO publishes the engagement scoring logic as open source code. The exact version of that code used to calculate each weekly payout is recorded publicly alongside the distribution. Creators can audit the formula used to calculate their share and verify their own numbers are correct.
+
+<Note>
+  Full verifiable payouts — including on-chain merkle proofs that let creators independently confirm their earnings — are coming in a future release. The current MVP calculates and distributes payouts automatically without the additional cryptographic verification layer.
+</Note>

@@ -1,0 +1,56 @@
+---
+title: "Attestation"
+description: "Hardware vs software WebAuthn and why it matters for payouts."
+---
+
+Device attestation is the economic backbone of viDAO. The short version: only users with a hardware-attested passkey accumulate watch time that counts toward creator payouts.
+
+## The two states
+
+Every `User` row has a `webauthnAttestationType` column with two possible values:
+
+- `SOFTWARE` — default. The user registered with Privy but either skipped passkey enrollment or used a software authenticator.
+- `HARDWARE` — set when the user successfully enrols a WebAuthn passkey with `useLinkWithPasskey` from `@privy-io/react-auth`.
+
+A `SOFTWARE` user can still sign in, subscribe, and watch videos. Their heartbeat requests return 200, but the heartbeat endpoint silently refuses to increment `weightedSeconds`. See [heartbeat protocol](/concepts/heartbeat-protocol).
+
+## Enrollment flow
+
+The onboarding page at `apps/web/src/app/onboarding/page.tsx` walks users through a three-step wizard:
+
+<Steps>
+  <Step title="Login">
+    Privy email login creates the account and embedded wallet.
+  </Step>
+  <Step title="Enroll passkey">
+    `linkWithPasskey()` triggers the browser's WebAuthn prompt. On success, the client sends `POST /api/auth/register` with `attestationType: "HARDWARE"` and the credential ID from the new passkey in `user.linkedAccounts`. The register route upserts the user with `webauthnAttestationType = HARDWARE`.
+  </Step>
+  <Step title="Complete">
+    The server sets `webauthnCredentialId` and flips the attestation type. Redirect to `/`.
+  </Step>
+</Steps>
+
+Users can skip the passkey step. That calls `POST /api/auth/register` with `attestationType: "SOFTWARE"` — they are then registered but will not accrue weighted hours.
+
+Users who skipped can come back later. `EnrollPasskeyButton` on the profile page runs the same `linkWithPasskey` flow and upgrades their row to `HARDWARE`.
+
+## Why "trust Privy's attestation flag"?
+
+For MVP, viDAO treats a successfully enrolled Privy passkey as "hardware attested". This is lenient — a fuller implementation would inspect the raw attestation statement from the authenticator and verify it came from an AAGUID on an allowlist of known hardware-backed authenticators (Secure Enclave, StrongBox, TPM 2.0, Apple Silicon).
+
+That validation is a Phase 6+ concern. For the MVP, any successful passkey enrollment on a modern browser is accepted as hardware. The attack cost floor is still roughly one real device; the ceiling is "someone got a software authenticator past Privy", which is not the interesting attack.
+
+## Device coverage
+
+Per the product vision (`viDAO.md`), hardware attestation is available on:
+
+- iPhone 5s+ (Secure Enclave, 2013+)
+- Android devices with StrongBox (required on Android 9+)
+- Windows 10+ with TPM 2.0
+- Mac with T2 chip or Apple Silicon
+
+This covers ~90% of streaming-capable devices in developed markets.
+
+<Info>
+The `{ ready }` state from `usePrivy()` must be `true` before `linkWithPasskey()` is called, otherwise Privy throws "Method called before ready". The onboarding and profile pages both gate the button on `ready`.
+</Info>

@@ -1,0 +1,68 @@
+---
+title: "Environment variables"
+description: "Every env var used by the web app and contracts, with purpose."
+---
+
+All env vars are read via `process.env` — there is no typed config wrapper. `apps/web/.env` is loaded by Next.js, `contracts/.env` (if present) is loaded by Hardhat via `dotenv`.
+
+## Web app (`apps/web/.env`)
+
+### Database
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Postgres connection string. Used by Prisma and the `@prisma/adapter-pg` driver. |
+
+### Privy
+
+| Variable | Purpose |
+|---|---|
+| `PRIVY_APP_ID` | Privy application id. Used server-side by `PrivyClient`. |
+| `PRIVY_APP_SECRET` | Privy app secret. Server-side only — never exposed to the client. |
+| `NEXT_PUBLIC_PRIVY_APP_ID` | Same app id, exposed to the client for `PrivyProvider`. |
+
+### Contract + on-chain
+
+| Variable | Purpose |
+|---|---|
+| `PAYOUT_POOL_ADDRESS` | Deployed `PayoutPool` contract address. Used by `apps/web/src/lib/contract.ts` and the payout cron. |
+| `USDC_TOKEN_ADDRESS` | USDC token address the pool holds. |
+| `ARBITRUM_SEPOLIA_RPC` | RPC endpoint. Defaults to `https://sepolia-rollup.arbitrum.io/rpc` if unset. Point at `http://localhost:8547` when using the Hardhat devnode. |
+| `DEPLOYER_PRIVATE_KEY` | Server-side signer used for `distribute` calls from the payout cron. **Required for the cron to actually push funds.** Without it, the cron writes `PENDING` rows and logs a warning. |
+
+### Subscriptions (Transak)
+
+| Variable | Purpose |
+|---|---|
+| `TRANSAK_ACCESS_TOKEN` | Used as the HMAC secret to decrypt the encrypted JWT inside Transak webhook payloads. |
+| `NEXT_PUBLIC_TRANSAK_API_KEY` | Client-side Transak API key. Used by `SubscribeButton` when not in mock mode. |
+| `NEXT_PUBLIC_DEV_MOCK_TRANSAK` | When `"true"`, the subscribe flow hits `/api/dev/fake-subscribe` instead of opening the Transak widget. Dev only. See [mock Transak](/runbooks/mock-transak). |
+
+### Cron
+
+| Variable | Purpose |
+|---|---|
+| `CRON_SECRET` | Shared bearer token. `POST /api/cron/payout` rejects any request whose `Authorization` header is not `Bearer $CRON_SECRET`. |
+
+### Video storage
+
+| Variable | Purpose |
+|---|---|
+| `VIDEO_UPLOAD_DIR` | Directory for uploaded video files. Defaults to `public/videos`. Served at `/videos/...`. |
+| `THUMBNAIL_UPLOAD_DIR` | Directory for generated thumbnails. Defaults to `public/thumbnails`. |
+
+## Contracts (`contracts/.env`)
+
+| Variable | Purpose |
+|---|---|
+| `PRIVATE_KEY` | Deployer key used by `npx hardhat arb:deploy`. |
+| `ARBITRUM_SEPOLIA_RPC_URL` | Target RPC for deploys. |
+
+## What breaks if something is missing
+
+- No `DATABASE_URL` → Prisma client throws on startup.
+- No `PRIVY_APP_ID`/`PRIVY_APP_SECRET` → every authenticated request returns 401.
+- No `CRON_SECRET` → `/api/cron/payout` returns `500 { error: "CRON_SECRET not configured" }`.
+- No `DEPLOYER_PRIVATE_KEY` → cron still runs, still writes rows, but never sends an on-chain tx. All rows come out `PENDING`.
+- No `PAYOUT_POOL_ADDRESS` → cron fails when trying to read `pool_balance()`.
+- No `NEXT_PUBLIC_DEV_MOCK_TRANSAK` → subscribe button opens the real Transak widget (which will not reach localhost webhooks).

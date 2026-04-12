@@ -1,0 +1,124 @@
+---
+title: "Upload Videos as a Creator — POST /api/videos/upload"
+description: "Publish video content as a StreamDAO creator. Accepts multipart/form-data up to 500 MB and auto-generates a thumbnail from the first second of footage."
+---
+
+The video upload endpoint allows users with the `CREATOR` role to publish video content to StreamDAO. You submit a multipart form with the video file, a required title, and an optional description. The server stores the video, runs ffmpeg to extract a thumbnail from the first second of footage, persists the video record, and returns the video ID and paths.
+
+<Note>
+  Creator access is invite-only during the MVP. If `POST /api/auth/register` returns `"role": "VIEWER"`, you do not have upload access. Contact the platform operator to request creator status.
+</Note>
+
+## Request
+
+```
+POST /api/videos/upload
+Content-Type: multipart/form-data
+```
+
+A valid session cookie with the `CREATOR` role is required.
+
+<ParamField body="file" type="File" required>
+  The video file to upload. Must have a `video/*` MIME type (e.g. `video/mp4`, `video/webm`, `video/quicktime`). Maximum size is **500 MB**. Files exceeding this limit receive a `413` response before the body is fully read.
+</ParamField>
+
+<ParamField body="title" type="string" required>
+  The video title, displayed on the platform. Must be a non-empty string. Leading and trailing whitespace is trimmed before storage.
+</ParamField>
+
+<ParamField body="description" type="string">
+  An optional description shown below the video player. Leading and trailing whitespace is trimmed. If omitted, the stored `description` is `null`.
+</ParamField>
+
+## Response
+
+On success the endpoint returns `HTTP 200` with the newly created video record:
+
+<ResponseField name="id" type="string">
+  The video's internal UUID, used to reference the video in watch sessions and the creator dashboard.
+</ResponseField>
+
+<ResponseField name="videoPath" type="string">
+  The server-relative path to the stored video file, e.g. `/videos/a3f8c2d1e4b5.mp4`. Resolve against your StreamDAO base URL to construct a playback URL.
+</ResponseField>
+
+<ResponseField name="thumbnailUrl" type="string | null">
+  The server-relative path to the auto-generated thumbnail image, e.g. `/thumbnails/a3f8c2d1e4b5.jpg`. This is `null` if ffmpeg failed to extract a frame (e.g. the file is a valid video container but contains no decodable video frames).
+</ResponseField>
+
+```json
+{
+  "id": "clxr9p2w40000kw3k9d5f1abc",
+  "videoPath": "/videos/a3f8c2d1e4b59f2e.mp4",
+  "thumbnailUrl": "/thumbnails/a3f8c2d1e4b59f2e.jpg"
+}
+```
+
+## Thumbnail generation
+
+The server uses ffmpeg to seek to the **1-second mark** of the uploaded video and extract a single frame, scaled to 640 px wide (height preserved by aspect ratio, quality level 3). This happens synchronously before the response is sent — the upload request blocks until thumbnail extraction completes or fails.
+
+If thumbnail extraction fails for any reason (ffmpeg not installed, corrupt video, no video stream), the video record is still created and `thumbnailUrl` is returned as `null`. Extraction failure does not prevent the upload from succeeding.
+
+## Error responses
+
+| Status | Condition |
+|--------|-----------|
+| `401 Unauthorized` | No valid session cookie. |
+| `403 Forbidden` | Authenticated user does not have the `CREATOR` role. |
+| `400 Bad Request` | `file` field is missing, or `title` is missing or blank, or the file's MIME type does not start with `video/`. |
+| `413 Content Too Large` | File size exceeds 500 MB. |
+
+Error responses follow the standard shape:
+
+```json
+{
+  "error": "Only creators can upload videos"
+}
+```
+
+## Example
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://your-streamdao-instance.com/api/videos/upload \
+  --cookie "privy-session=<your-session-cookie>" \
+  -F "file=@/path/to/video.mp4" \
+  -F "title=My First Stream" \
+  -F "description=A quick introduction to what I do."
+```
+
+```ts TypeScript (fetch)
+async function uploadVideo(file: File, title: string, description?: string) {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('title', title);
+  if (description) form.append('description', description);
+
+  const res = await fetch('/api/videos/upload', {
+    method: 'POST',
+    credentials: 'include', // sends session cookie automatically
+    body: form,
+    // Do NOT set Content-Type manually — the browser sets the multipart
+    // boundary automatically when you pass a FormData body.
+  });
+
+  if (!res.ok) {
+    const { error } = await res.json();
+    throw new Error(`Upload failed (${res.status}): ${error}`);
+  }
+
+  return res.json() as Promise<{
+    id: string;
+    videoPath: string;
+    thumbnailUrl: string | null;
+  }>;
+}
+```
+</CodeGroup>
+
+<Warning>
+  Do not set the `Content-Type` header manually when using `FormData` in the browser or Node.js `fetch`. The runtime must set it automatically so the multipart boundary is included. Manually specifying `multipart/form-data` without the boundary string will cause the server to fail parsing the body.
+</Warning>
+
+

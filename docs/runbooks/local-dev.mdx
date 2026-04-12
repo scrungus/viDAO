@@ -1,0 +1,84 @@
+---
+title: "Local development"
+description: "Clone, install, and run the web app, database, and Arbitrum devnode."
+---
+
+This runbook walks through bringing up a fresh checkout end to end.
+
+## Prerequisites
+
+- Node.js 20+
+- Postgres 14+ running locally (or a connection string to a hosted instance)
+- Podman or Docker (for the Arbitrum devnode used by Hardhat)
+- `npx` / `npm` 10+
+
+<Tip>
+If you use Podman, the Hardhat Stylus plugin shells out to `docker`. Create a wrapper at `~/bin/docker` that forwards to `podman` and add it to your `PATH`. You will also need `~/.config/containers/registries.conf` with `unqualified-search-registries = ["docker.io"]` so that short image names like `rust:slim` resolve.
+</Tip>
+
+## Clone and install
+
+```bash
+git clone <repo-url> viDAO
+cd viDAO
+(cd apps/web && npm install)
+(cd contracts && npm install)
+```
+
+## Bring up Postgres
+
+Either point `DATABASE_URL` at an existing Postgres, or run one locally. The schema is applied via Prisma migrations:
+
+```bash
+cd apps/web
+cp .env.example .env   # adjust DATABASE_URL if needed
+npx prisma migrate dev
+npm run prisma:seed    # optional — see runbooks/seeding
+```
+
+See [env vars](/runbooks/env-vars) for the full list of required environment variables.
+
+## Run the web app
+
+```bash
+cd apps/web
+npm run dev
+```
+
+The app listens on `http://localhost:3000`. Log in through Privy, then visit `/profile` to enroll a passkey.
+
+## Bring up the Arbitrum devnode
+
+The contract tests and local deployment use a Hardhat-managed Arbitrum devnode. From `contracts/`:
+
+```bash
+npm run node:start    # docker-in-the-loop; takes ~30s first time
+npm run node:status   # confirm it's up
+# ... work ...
+npm run node:stop
+```
+
+The devnode exposes RPC at `http://localhost:8547`. Set `ARBITRUM_SEPOLIA_RPC=http://localhost:8547` in `apps/web/.env` to point the web app at it.
+
+## Compile and deploy the contract
+
+```bash
+cd contracts
+npm run compile   # wraps `npx hardhat arb:compile`
+npm run deploy    # wraps `npx hardhat arb:deploy`
+```
+
+The deploy task prints the deployed `PayoutPool` address. Copy it into `apps/web/.env` as `PAYOUT_POOL_ADDRESS`, along with the mock USDC token address.
+
+## Mock the subscription flow
+
+Transak sandbox webhooks cannot reach `localhost`. For dev, use the mock flag described in [mock Transak](/runbooks/mock-transak).
+
+## Day-to-day
+
+Typical dev loop:
+
+1. `npm run dev` in `apps/web`
+2. `npm run node:start` in `contracts` (only if working on contract changes)
+3. Edit code
+4. Run tests — see [testing](/runbooks/testing)
