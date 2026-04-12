@@ -96,6 +96,24 @@ jobs:
         run: |
           kubectl -n "$NAMESPACE" rollout status deployment/vidao-web --timeout=5m
 
+      - name: Seed fixture data
+        working-directory: apps/web
+        env:
+          DATABASE_URL: postgresql://vidao:vidao@127.0.0.1:5432/vidao?schema=public
+        run: |
+          kubectl -n "$NAMESPACE" port-forward svc/postgres 5432:5432 >/tmp/pf.log 2>&1 &
+          PF_PID=$!
+          trap 'kill $PF_PID >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 30); do
+            if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          npm ci
+          npx prisma generate
+          npx tsx prisma/seed.ts
+
       - name: Dump cluster state
         if: always()
         run: |

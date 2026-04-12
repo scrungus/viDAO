@@ -68,14 +68,8 @@ export async function POST(request: Request) {
     );
   }
 
-  // Persist file. In k8s this should be a PVC mounted at /videos — for now,
-  // local dev uses public/videos/ so Next.js serves it statically.
-  const videoDir =
-    process.env.VIDEO_UPLOAD_DIR ??
-    path.join(process.cwd(), "public", "videos");
-  const thumbDir =
-    process.env.THUMBNAIL_UPLOAD_DIR ??
-    path.join(process.cwd(), "public", "thumbnails");
+  const videoDir = process.env.VIDEO_UPLOAD_DIR ?? "./public/videos";
+  const thumbDir = process.env.THUMBNAIL_UPLOAD_DIR ?? "./public/thumbnails";
   await mkdir(videoDir, { recursive: true });
   await mkdir(thumbDir, { recursive: true });
 

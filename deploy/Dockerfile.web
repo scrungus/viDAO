@@ -16,7 +16,13 @@ WORKDIR /app
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY apps/web ./apps/web
 
-ENV NEXT_TELEMETRY_DISABLED=1
+# NEXT_PUBLIC_* values are inlined at build time, so the real Privy app id
+# must be supplied here for prod/homelab builds. CI leaves it empty — the
+# PrivyProvider falls back to a no-op guard, which is fine for stack-bringup
+# tests that don't exercise auth.
+ARG NEXT_PUBLIC_PRIVY_APP_ID=""
+ENV NEXT_PUBLIC_PRIVY_APP_ID=$NEXT_PUBLIC_PRIVY_APP_ID \
+    NEXT_TELEMETRY_DISABLED=1
 RUN cd apps/web && npx prisma generate && npm run build
 
 # --- runner (prod) ------------------------------------------------------

@@ -169,3 +169,33 @@ k8s_resource('vidao-web', port_forwards=['3000:3000'], resource_deps=['vidao-ns'
 k8s_resource('vidao-postgres', port_forwards=['5432:5432'])
 k8s_resource('vidao-devnode', port_forwards=['8547:8547', '8548:8548'])
 k8s_resource('vidao-deployer', resource_deps=['vidao-devnode'])
+
+# --- Fixture seed ----------------------------------------------------------
+# Host-side: runs tsx against the port-forwarded postgres. Kept out of the
+# runner image so prod doesn't ship devDeps. Homelab/CI never triggers this
+# Tilt resource; CI has its own seed step, homelab is left empty on purpose.
+local_resource(
+    'vidao-seed',
+    cmd=(
+        'cd ../apps/web && '
+        'npx prisma generate >/dev/null && '
+        'DATABASE_URL="postgresql://vidao:vidao@127.0.0.1:5432/vidao?schema=public" '
+        'npx tsx prisma/seed.ts'
+    ),
+    resource_deps=['vidao-postgres', 'vidao-web', 'vidao-deployer'],
+    auto_init=True,
+    allow_parallel=False,
+)
+
+# --- Full teardown / reinit ------------------------------------------------
+# Manual button: wipes /data, drops the DB schema, redeploys contracts via
+# helm upgrade hook, restarts web, re-seeds. Does NOT touch Privy users —
+# see deploy/scripts/reset-dev.sh header.
+local_resource(
+    'vidao-reset',
+    cmd='bash ./scripts/reset-dev.sh',
+    auto_init=False,
+    trigger_mode=TRIGGER_MODE_MANUAL,
+    allow_parallel=False,
+    resource_deps=['vidao-postgres', 'vidao-web'],
+)
