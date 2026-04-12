@@ -1,0 +1,58 @@
+{{- if .Values.deployer.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vidao-deployer
+  namespace: {{ include "vidao.namespace" . }}
+  labels:
+    {{- include "vidao.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "vidao.labels" . | nindent 8 }}
+        app: vidao-deployer
+    spec:
+      serviceAccountName: vidao-deployer
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-devnode
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z devnode {{ .Values.devnode.service.rpcPort }}; do
+                echo "waiting for devnode:{{ .Values.devnode.service.rpcPort }}..."
+                sleep 2
+              done
+      containers:
+        - name: deployer
+          image: "{{ .Values.deployer.image.repository }}:{{ .Values.deployer.image.tag }}"
+          imagePullPolicy: {{ .Values.deployer.image.pullPolicy | default "IfNotPresent" }}
+          env:
+            - name: ARB_RPC_URL
+              value: "http://devnode:{{ .Values.devnode.service.rpcPort }}"
+            - name: ADDRESSES_OUT
+              value: "/out/addresses.json"
+            - name: TARGET_NAMESPACE
+              value: {{ include "vidao.namespace" . | quote }}
+            - name: CONFIGMAP_NAME
+              value: "vidao-contracts"
+            - name: WEB_DEPLOYMENT
+              value: "vidao-web"
+            - name: DEPLOYER_PRIVATE_KEY
+              value: {{ .Values.deployer.chainOwnerKey | quote }}
+          volumeMounts:
+            - name: out
+              mountPath: /out
+      volumes:
+        - name: out
+          emptyDir: {}
+{{- end }}

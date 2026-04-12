@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/coverage
+contracts/cache
+contracts/artifacts
+contracts/out
+contracts/typechain-types
+apps/web/tsconfig.tsbuildinfo
+deploy/helm/charts

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vidao-contracts
+  namespace: {{ include "vidao.namespace" . }}
+  labels:
+    {{- include "vidao.labels" . | nindent 4 }}
+  annotations:
+    # Populated by the post-install deployer Job; Helm will reset this on upgrade,
+    # and the post-upgrade deployer Job re-patches it.
+    "helm.sh/resource-policy": keep
+data:
+  PAYOUT_POOL_ADDRESS: ""
+  USDC_TOKEN_ADDRESS: ""
+  ARBITRUM_SEPOLIA_RPC: "http://devnode:{{ .Values.devnode.service.rpcPort }}"

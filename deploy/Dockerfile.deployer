@@ -1,0 +1,50 @@
+# syntax=docker/dockerfile:1.7
+FROM node:22-bookworm-slim AS deployer
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl gnupg git jq build-essential pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# kubectl
+RUN curl -fsSLo /usr/local/bin/kubectl \
+      "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl" \
+    && chmod +x /usr/local/bin/kubectl
+
+# Rust 1.91 + wasm32 target (matches contracts/contracts/stylus/payout-pool/rust-toolchain.toml)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+      | sh -s -- -y --default-toolchain 1.91.0 --target wasm32-unknown-unknown --profile minimal \
+    && rustup component add rust-src --toolchain 1.91.0 \
+    && cargo --version && rustc --version \
+    && cargo install --locked cargo-stylus
+
+WORKDIR /app
+
+# Install contract deps first so Docker caches them across code-only changes.
+COPY contracts/package.json contracts/package-lock.json ./contracts/
+RUN cd contracts && npm ci \
+    && HOOK=node_modules/@cobuilders/hardhat-arb-node/dist/src/plugin/hooks/network.js \
+    && node -e "const fs=require('fs'),f=process.argv[1];let s=fs.readFileSync(f,'utf8');if(!s.includes(\"if (defaultNetwork?.type === 'http')\"))throw new Error('pattern not found in '+f);s=s.replace(\"if (defaultNetwork?.type === 'http')\",'if (false)');fs.writeFileSync(f,s);console.log('[patch] disabled arb-node newConnection container autostart in',f);" "$HOOK"
+
+COPY contracts ./contracts
+
+# Stylus compile is deferred to runtime: the plugin always starts an
+# Arbitrum node (ephemeral via Docker, or external via --network) and we
+# don't have Docker inside this image. Runtime has http://devnode:8547
+# reachable, so the entrypoint runs `arb:compile --host --network localStylus`.
+
+RUN mkdir -p /out
+VOLUME ["/out"]
+
+ENV ADDRESSES_OUT=/out/addresses.json \
+    ARB_RPC_URL=http://devnode:8547
+
+COPY deploy/scripts/entrypoint-deployer.sh /usr/local/bin/entrypoint-deployer.sh
+RUN chmod +x /usr/local/bin/entrypoint-deployer.sh
+
+WORKDIR /app/contracts
+ENTRYPOINT ["/usr/local/bin/entrypoint-deployer.sh"]

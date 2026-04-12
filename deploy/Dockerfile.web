@@ -1,0 +1,79 @@
+# syntax=docker/dockerfile:1.7
+
+# --- deps ---------------------------------------------------------------
+FROM node:22-alpine AS deps
+RUN apk add --no-cache libc6-compat openssl
+WORKDIR /app
+
+COPY apps/web/package.json apps/web/package-lock.json ./apps/web/
+RUN cd apps/web && npm ci
+
+# --- builder ------------------------------------------------------------
+FROM node:22-alpine AS builder
+RUN apk add --no-cache libc6-compat openssl
+WORKDIR /app
+
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY apps/web ./apps/web
+
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN cd apps/web && npx prisma generate && npm run build
+
+# --- runner (prod) ------------------------------------------------------
+FROM node:22-alpine AS runner
+RUN apk add --no-cache ffmpeg curl openssl
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0 \
+    VIDEO_UPLOAD_DIR=/data/videos \
+    THUMBNAIL_UPLOAD_DIR=/data/thumbnails
+
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 nextjs \
+    && mkdir -p /data/videos /data/thumbnails \
+    && chown -R nextjs:nodejs /data
+
+# `outputFileTracingRoot` points at the monorepo root, so the standalone
+# bundle is emitted under apps/web/.next/standalone with that layout.
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/prisma ./apps/web/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/node_modules/.prisma ./apps/web/node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/node_modules/@prisma ./apps/web/node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/node_modules/prisma ./apps/web/node_modules/prisma
+
+COPY --chown=nextjs:nodejs deploy/scripts/entrypoint-web.sh /usr/local/bin/entrypoint-web.sh
+RUN chmod +x /usr/local/bin/entrypoint-web.sh
+
+USER nextjs
+EXPOSE 3000
+VOLUME ["/data"]
+ENTRYPOINT ["/usr/local/bin/entrypoint-web.sh"]
+
+# --- dev (Tilt live_update target) --------------------------------------
+FROM node:22-alpine AS dev
+RUN apk add --no-cache libc6-compat openssl ffmpeg curl
+WORKDIR /app
+
+ENV NODE_ENV=development \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0 \
+    VIDEO_UPLOAD_DIR=/data/videos \
+    THUMBNAIL_UPLOAD_DIR=/data/thumbnails
+
+RUN mkdir -p /data/videos /data/thumbnails
+
+COPY apps/web/package.json apps/web/package-lock.json ./apps/web/
+RUN cd apps/web && npm ci
+
+COPY apps/web ./apps/web
+RUN cd apps/web && npx prisma generate
+
+EXPOSE 3000
+WORKDIR /app/apps/web
+CMD ["sh", "-c", "npx prisma migrate deploy && npx next dev --turbopack --port 3000 --hostname 0.0.0.0"]

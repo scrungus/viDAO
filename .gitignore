@@ -1,1 +1,10 @@
 node_modules/
+
+# deploy / helm
+deploy/.env.local
+deploy/helm/charts/
+
+# contracts
+contracts/out/
+contracts/cache/
+contracts/artifacts/

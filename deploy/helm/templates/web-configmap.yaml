@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vidao-web
+  namespace: {{ include "vidao.namespace" . }}
+  labels:
+    {{- include "vidao.labels" . | nindent 4 }}
+data:
+  {{- range $k, $v := .Values.web.env }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}

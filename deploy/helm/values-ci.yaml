@@ -1,0 +1,33 @@
+# Overrides for GitHub Actions k3d run.
+namespace:
+  name: vidao-ci
+
+web:
+  image:
+    repository: k3d-vidao-registry.localhost:5000/vidao-web
+    tag: ci
+    pullPolicy: IfNotPresent
+
+deployer:
+  enabled: true
+  image:
+    repository: k3d-vidao-registry.localhost:5000/vidao-deployer
+    tag: ci
+
+devnode:
+  enabled: true
+
+ingress:
+  enabled: false
+
+cron:
+  enabled: false
+
+secrets:
+  externalSecret: false
+  DATABASE_URL: "postgresql://vidao:vidao@postgres:5432/vidao?schema=public"
+  PRIVY_APP_ID: "ci-placeholder"
+  PRIVY_APP_SECRET: "ci-placeholder"
+  TRANSAK_ACCESS_TOKEN: "ci-placeholder"
+  CRON_SECRET: "ci-cron-secret"
+  DEPLOYER_PRIVATE_KEY: "0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659"

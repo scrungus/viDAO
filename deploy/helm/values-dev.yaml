@@ -1,0 +1,27 @@
+# Overrides for `tilt up` local dev.
+namespace:
+  name: vidao-dev
+
+web:
+  image:
+    tag: dev
+    pullPolicy: IfNotPresent
+
+deployer:
+  enabled: true
+  image:
+    tag: dev
+
+devnode:
+  enabled: true
+
+# Use the Tilt-built Secret created from deploy/.env.local.
+secrets:
+  externalSecret: true
+  secretName: vidao-web-secrets
+
+ingress:
+  enabled: false
+
+cron:
+  enabled: false

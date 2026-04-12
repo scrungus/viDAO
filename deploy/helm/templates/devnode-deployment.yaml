@@ -1,0 +1,57 @@
+{{- if .Values.devnode.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vidao-devnode
+  namespace: {{ include "vidao.namespace" . }}
+  labels:
+    {{- include "vidao.labels" . | nindent 4 }}
+    app: vidao-devnode
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vidao-devnode
+  template:
+    metadata:
+      labels:
+        {{- include "vidao.labels" . | nindent 8 }}
+        app: vidao-devnode
+    spec:
+      containers:
+        - name: nitro
+          image: "{{ .Values.devnode.image.repository }}:{{ .Values.devnode.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--dev"
+            - "--http.api=eth,net,web3,debug"
+            - "--http.corsdomain=*"
+            - "--http.addr=0.0.0.0"
+            - "--http.vhosts=*"
+            - "--ws.api=eth,net,web3,debug"
+            - "--ws.addr=0.0.0.0"
+            - "--ws.origins=*"
+          ports:
+            - containerPort: 8547
+              name: rpc
+            - containerPort: 8548
+              name: ws
+          volumeMounts:
+            - name: chain
+              mountPath: /home/user/.arbitrum
+          readinessProbe:
+            tcpSocket:
+              port: 8547
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8547
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: chain
+          emptyDir: {}
+{{- end }}

@@ -1,0 +1,40 @@
+{{- if .Values.cron.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vidao-payout-cron
+  namespace: {{ include "vidao.namespace" . }}
+  labels:
+    {{- include "vidao.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cron.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            {{- include "vidao.labels" . | nindent 12 }}
+            app: vidao-payout-cron
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: trigger
+              image: {{ .Values.cron.image | quote }}
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.secrets.secretName }}
+                      key: CRON_SECRET
+              command:
+                - sh
+                - -c
+                - |
+                  curl -fsS -X POST \
+                    http://web:{{ .Values.web.service.port }}/api/cron/payout \
+                    -H "Authorization: Bearer $CRON_SECRET"
+{{- end }}

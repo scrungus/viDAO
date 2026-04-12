@@ -1,0 +1,171 @@
+# viDAO Tiltfile — mirrors DamBuster/deploy/Tiltfile structure for podman + helm.
+
+COMMON_IGNORE_PATTERNS = [
+    '.git',
+    '**/node_modules',
+    '**/.next/cache',
+    '**/target',
+    'contracts/cache',
+    'contracts/artifacts',
+    'contracts/out',
+    'apps/web/tsconfig.tsbuildinfo',
+]
+
+config.define_string("env", args=False, usage="Development environment (local/homelab)")
+cfg = config.parse()
+ENV = cfg.get('env', 'local')
+
+k8s_context = 'default'
+allow_k8s_contexts(k8s_context)
+
+NAMESPACE = 'vidao-dev'
+
+# Reuse the shared homelab registry: /etc/hosts points registry.lab at this
+# box, Traefik fronts the in-cluster registry Service under that hostname,
+# and /etc/rancher/k3s/registries.yaml already marks it insecure. Same URL
+# works for host-side podman push and in-cluster containerd pull.
+default_registry('registry.lab')
+
+def podman_build(ref, context, ignore=None, extra_flags=None, push_extra_flags=None, deps=None, live_update=[]):
+    deps = deps or [context]
+    extra_flags = extra_flags or []
+    push_extra_flags = push_extra_flags or []
+    extra_flags_str = ' '.join([shlex.quote(f) for f in extra_flags])
+    push_extra_flags_str = ' '.join([shlex.quote(f) for f in push_extra_flags])
+    push_cmd = "podman push %s --format=docker $EXPECTED_REF\n" % push_extra_flags_str
+    custom_build(
+        ref=ref,
+        command=(
+            "set -ex\n" +
+            "podman build -t $EXPECTED_REF %s %s\n" +
+            push_cmd
+        ) % (extra_flags_str, shlex.quote(context)),
+        ignore=ignore,
+        deps=deps,
+        live_update=live_update,
+        skips_local_docker=True,
+    )
+
+def do_build(ref, context, dockerfile, target=None, live_update=None, ignore=None, deps=None):
+    extra_flags = ['-f', dockerfile, '--tls-verify=false']
+    if target:
+        extra_flags += ['--target', target]
+    push_flags = ['--tls-verify=false']
+    current_ignore = list(ignore) if ignore else []
+    current_ignore.extend(COMMON_IGNORE_PATTERNS)
+    podman_build(
+        ref,
+        context,
+        extra_flags=extra_flags,
+        push_extra_flags=push_flags,
+        live_update=live_update or [],
+        ignore=current_ignore,
+        deps=deps or [dockerfile, context],
+    )
+
+# --- web (dev target + live_update) ---------------------------------------
+do_build(
+    'vidao-web',
+    '..',  # repo root as build context
+    dockerfile='Dockerfile.web',
+    target='dev',
+    live_update=[
+        sync('../apps/web/src', '/app/apps/web/src'),
+        sync('../apps/web/public', '/app/apps/web/public'),
+        sync('../apps/web/prisma', '/app/apps/web/prisma'),
+        run(
+            'cd /app/apps/web && npx prisma generate',
+            trigger=['../apps/web/prisma/schema.prisma'],
+        ),
+    ],
+    deps=[
+        'Dockerfile.web',
+        '../apps/web/package.json',
+        '../apps/web/package-lock.json',
+        '../apps/web/src',
+        '../apps/web/public',
+        '../apps/web/prisma',
+    ],
+)
+
+# --- contract deployer -----------------------------------------------------
+do_build(
+    'vidao-deployer',
+    '..',
+    dockerfile='Dockerfile.deployer',
+    deps=[
+        'Dockerfile.deployer',
+        'scripts/entrypoint-deployer.sh',
+        '../contracts/package.json',
+        '../contracts/package-lock.json',
+        '../contracts/hardhat.config.ts',
+        '../contracts/contracts',
+        '../contracts/scripts',
+    ],
+)
+
+# --- Tilt-managed Secret from apps/web/.env --------------------------------
+# Reuse the same env file you already use with `npx next dev` — just override
+# the two keys that differ inside the cluster (DB hostname, deployer key).
+def load_env_file(path):
+    out = {}
+    text = str(read_file(path))
+    for raw in text.split('\n'):
+        line = raw.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        k, v = line.split('=', 1)
+        k = k.strip()
+        v = v.strip()
+        if len(v) >= 2 and ((v[0] == '"' and v[-1] == '"') or (v[0] == "'" and v[-1] == "'")):
+            v = v[1:-1]
+        out[k] = v
+    return out
+
+env_map = load_env_file('../apps/web/.env')
+
+# In-cluster overrides.
+env_map['DATABASE_URL'] = 'postgresql://vidao:vidao@postgres:5432/vidao?schema=public'
+env_map['DEPLOYER_PRIVATE_KEY'] = env_map.get(
+    'DEPLOYER_PRIVATE_KEY',
+    '0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659',
+)
+
+k8s_yaml(encode_yaml({
+    'apiVersion': 'v1',
+    'kind': 'Secret',
+    'metadata': {
+        'name': 'vidao-web-secrets',
+        'namespace': NAMESPACE,
+    },
+    'type': 'Opaque',
+    'stringData': env_map,
+}))
+
+local_resource(
+    'vidao-ns',
+    cmd='kubectl create namespace {ns} || true'.format(ns=NAMESPACE),
+    auto_init=True,
+)
+
+# --- Helm chart ------------------------------------------------------------
+watch_file('helm/Chart.yaml')
+watch_file('helm/values.yaml')
+watch_file('helm/values-dev.yaml')
+watch_file('helm/templates')
+
+k8s_yaml(helm(
+    'helm/',
+    name='vidao',
+    namespace=NAMESPACE,
+    values=[
+        'helm/values.yaml',
+        'helm/values-dev.yaml',
+    ],
+))
+
+# --- Port forwards ---------------------------------------------------------
+k8s_resource('vidao-web', port_forwards=['3000:3000'], resource_deps=['vidao-ns'])
+k8s_resource('vidao-postgres', port_forwards=['5432:5432'])
+k8s_resource('vidao-devnode', port_forwards=['8547:8547', '8548:8548'])
+k8s_resource('vidao-deployer', resource_deps=['vidao-devnode'])

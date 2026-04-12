@@ -1,0 +1,37 @@
+# Overrides for homelab k3s deploy.
+namespace:
+  name: vidao
+
+web:
+  image:
+    repository: registry.lab/vidao-web
+    tag: latest
+    pullPolicy: Always
+  storage:
+    size: 50Gi
+
+deployer:
+  enabled: true
+  image:
+    repository: registry.lab/vidao-deployer
+    tag: latest
+
+devnode:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: traefik
+  host: vidao.lab
+  tls:
+    enabled: true
+    clusterIssuer: homelab-issuer
+    secretName: vidao-tls
+
+cron:
+  enabled: true
+  schedule: "0 0 * * 0"
+
+secrets:
+  externalSecret: true
+  secretName: vidao-web-secrets

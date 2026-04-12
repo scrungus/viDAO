@@ -8,7 +8,11 @@ const config: HardhatUserConfig = {
   networks: {
     localStylus: {
       type: "http",
-      url: "http://localhost:8547",
+      url: process.env.ARB_RPC_URL ?? "http://localhost:8547",
+      accounts: [
+        process.env.DEPLOYER_PRIVATE_KEY ??
+          "0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659",
+      ],
     },
   },
 };

@@ -1,0 +1,83 @@
+nameOverride: ""
+fullnameOverride: ""
+
+namespace:
+  create: true
+  name: vidao-dev
+
+web:
+  replicaCount: 1
+  image:
+    repository: vidao-web
+    tag: dev
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  resources: {}
+  storage:
+    size: 10Gi
+    storageClass: local-path
+  env:
+    NODE_ENV: development
+    NEXT_PUBLIC_DEV_MOCK_TRANSAK: "true"
+    NEXT_PUBLIC_TRANSAK_API_KEY: ""
+    NEXT_PUBLIC_PRIVY_APP_ID: ""
+
+# Placeholder secret values. Override with --set or -f values-*.yaml, or (in Tilt)
+# create the Secret out-of-band from deploy/.env.local and set externalSecret: true.
+secrets:
+  externalSecret: false
+  secretName: vidao-web-secrets
+  DATABASE_URL: "postgresql://vidao:vidao@postgres:5432/vidao?schema=public"
+  PRIVY_APP_ID: ""
+  PRIVY_APP_SECRET: ""
+  TRANSAK_ACCESS_TOKEN: ""
+  CRON_SECRET: "dev-cron-secret"
+  DEPLOYER_PRIVATE_KEY: "0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659"
+
+postgres:
+  image:
+    repository: postgres
+    tag: "16-alpine"
+  auth:
+    user: vidao
+    password: vidao
+    database: vidao
+  storage:
+    size: 5Gi
+    storageClass: local-path
+  service:
+    port: 5432
+
+devnode:
+  enabled: true
+  image:
+    repository: offchainlabs/nitro-node
+    tag: "v3.7.1-926f1ab"
+  service:
+    rpcPort: 8547
+    wsPort: 8548
+
+deployer:
+  enabled: true
+  image:
+    repository: vidao-deployer
+    tag: dev
+    pullPolicy: IfNotPresent
+  # Chain-owner key from @cobuilders/hardhat-arb-node devnode defaults.
+  chainOwnerKey: "0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659"
+
+ingress:
+  enabled: false
+  className: ""
+  host: vidao.local
+  tls:
+    enabled: false
+    clusterIssuer: homelab-issuer
+    secretName: vidao-tls
+
+cron:
+  enabled: true
+  schedule: "0 0 * * 0"
+  image: curlimages/curl:8.10.0

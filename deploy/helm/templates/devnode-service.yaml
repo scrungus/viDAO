@@ -1,0 +1,23 @@
+{{- if .Values.devnode.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: devnode
+  namespace: {{ include "vidao.namespace" . }}
+  labels:
+    {{- include "vidao.labels" . | nindent 4 }}
+    app: vidao-devnode
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.devnode.service.rpcPort }}
+      targetPort: 8547
+      protocol: TCP
+      name: rpc
+    - port: {{ .Values.devnode.service.wsPort }}
+      targetPort: 8548
+      protocol: TCP
+      name: ws
+  selector:
+    app: vidao-devnode
+{{- end }}
