@@ -56,9 +56,12 @@ export default function Header() {
                   Dashboard
                 </Link>
               )}
-              <span className="text-sm text-gray-400 hidden sm:inline">
+              <Link
+                href="/profile"
+                className="text-sm text-gray-400 hover:text-white transition-colors hidden sm:inline"
+              >
                 {user?.email?.address ?? "Connected"}
-              </span>
+              </Link>
               {subscribed === false && (
                 <Link
                   href="/subscribe"
