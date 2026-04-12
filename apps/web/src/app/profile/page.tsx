@@ -6,7 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { AttestationType } from "@/generated/prisma/client";
 import CopyWalletButton from "@/components/profile/CopyWalletButton";
 import EnrollPasskeyButton from "@/components/profile/EnrollPasskeyButton";
+import RemovePasskeyButton from "@/components/profile/RemovePasskeyButton";
 import SignOutButton from "@/components/profile/SignOutButton";
+import CancelSubscriptionButton from "@/components/profile/CancelSubscriptionButton";
 
 const SUBSCRIPTION_PERIOD_DAYS = 30;
 const MONTHLY_CAP_HOURS = 50;
@@ -130,7 +132,9 @@ export default async function ProfilePage() {
               />
             </div>
           </div>
-          {!isActive && (
+          {isActive ? (
+            <CancelSubscriptionButton />
+          ) : (
             <Link
               href="/subscribe"
               className="inline-block bg-violet-600 hover:bg-violet-500 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors shadow-lg shadow-violet-600/20"
@@ -260,18 +264,21 @@ export default async function ProfilePage() {
                     Your watch time counts toward creator payouts. This device
                     is verified as secure.
                   </p>
-                  <div className="mt-3 flex items-center gap-2 text-green-400 text-xs font-bold uppercase tracking-widest">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                    </svg>
-                    Verified
+                  <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 text-green-400 text-xs font-bold uppercase tracking-widest">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                      </svg>
+                      Verified
+                    </div>
+                    <RemovePasskeyButton />
                   </div>
                 </>
               ) : (

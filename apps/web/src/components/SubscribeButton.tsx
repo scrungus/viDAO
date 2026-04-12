@@ -19,21 +19,38 @@ export default function SubscribeButton() {
 
     if (MOCK_TRANSAK) {
       setLoading(true);
-      try {
-        const accessToken = await getAccessToken();
-        const res = await fetch("/api/dev/fake-subscribe", {
-          method: "POST",
-          headers: {
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          },
-        });
-        if (!res.ok) throw new Error(`Fake subscribe failed (${res.status})`);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Subscription failed");
-      } finally {
+      const popup = window.open(
+        "/dev/fake-transak",
+        "vidao-fake-transak",
+        "width=480,height=720,noopener=no",
+      );
+      if (!popup) {
+        setError("Pop-up blocked — allow pop-ups for this site");
         setLoading(false);
+        return;
       }
+      const poll = window.setInterval(async () => {
+        if (!popup.closed) return;
+        window.clearInterval(poll);
+        try {
+          const accessToken = await getAccessToken();
+          const res = await fetch("/api/subscription/status", {
+            method: "POST",
+            headers: accessToken
+              ? { Authorization: `Bearer ${accessToken}` }
+              : undefined,
+          });
+          const data = (await res.json().catch(() => null)) as {
+            subscribed?: boolean;
+          } | null;
+          if (data?.subscribed) {
+            router.push("/");
+            return;
+          }
+        } catch {}
+        setLoading(false);
+        router.refresh();
+      }, 500);
       return;
     }
 
