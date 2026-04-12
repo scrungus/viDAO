@@ -177,9 +177,9 @@ k8s_resource('vidao-deployer', resource_deps=['vidao-devnode'])
 local_resource(
     'vidao-seed',
     cmd=(
-        'cd ../apps/web && '
-        'npx prisma generate >/dev/null && '
-        'DATABASE_URL="postgresql://vidao:vidao@127.0.0.1:5432/vidao?schema=public" '
+        'cd ../apps/web && ' +
+        'npx prisma generate >/dev/null && ' +
+        'DATABASE_URL="postgresql://vidao:vidao@127.0.0.1:5432/vidao?schema=public" ' +
         'npx tsx prisma/seed.ts'
     ),
     resource_deps=['vidao-postgres', 'vidao-web', 'vidao-deployer'],

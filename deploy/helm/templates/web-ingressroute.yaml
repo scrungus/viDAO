@@ -8,7 +8,9 @@ metadata:
     {{- include "vidao.labels" . | nindent 4 }}
 spec:
   entryPoints:
-    - websecure
+    {{- range (default (list "websecure") .Values.ingress.entryPoints) }}
+    - {{ . }}
+    {{- end }}
   routes:
     - match: Host(`{{ .Values.ingress.host }}`)
       kind: Rule
