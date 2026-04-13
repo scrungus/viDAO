@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 type Step = "login" | "passkey" | "complete";
 
 export default function OnboardingPage() {
-  const { ready, authenticated, login } = usePrivy();
+  const { ready, authenticated, login, user } = usePrivy();
   const router = useRouter();
   const [step, setStep] = useState<Step>("login");
   const [error, setError] = useState<string | null>(null);
@@ -60,12 +60,26 @@ export default function OnboardingPage() {
     },
   });
 
-  // After Privy login completes, move to passkey step
+  // After Privy login completes, decide the next step. If Privy already
+  // attached a passkey during signup (user picked passkey inside the Privy
+  // modal), calling linkWithPasskey here would hit the 1-passkey-per-user
+  // limit — fast-path straight to finishRegistration with the existing
+  // credential instead.
   useEffect(() => {
-    if (ready && authenticated && step === "login") {
-      setStep("passkey");
+    if (!ready || !authenticated || step !== "login") return;
+    const existingPasskey = (user?.linkedAccounts ?? []).find(
+      (account): account is PasskeyWithMetadata => account.type === "passkey",
+    );
+    if (existingPasskey) {
+      setLoading(true);
+      finishRegistration(existingPasskey.credentialId).catch((err) => {
+        setError(err instanceof Error ? err.message : "Registration failed");
+        setLoading(false);
+      });
+      return;
     }
-  }, [ready, authenticated, step]);
+    setStep("passkey");
+  }, [ready, authenticated, step, user, finishRegistration]);
 
   const handleLogin = useCallback(() => {
     setError(null);

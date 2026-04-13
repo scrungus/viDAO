@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vidao-chain-pod-template
+  namespace: {{ .Values.namespace }}
+data:
+  pod.json: |
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "placeholder",
+        "labels": {
+          "app": "vidao-chain"
+        }
+      },
+      "spec": {
+        "restartPolicy": "Never",
+        "containers": [
+          {
+            "name": "nitro",
+            "image": "{{ .Values.chain.image.repository }}:{{ .Values.chain.image.tag }}",
+            "imagePullPolicy": "IfNotPresent",
+            "args": [
+              "--dev",
+              "--http.api=eth,net,web3,debug",
+              "--http.corsdomain=*",
+              "--http.addr=0.0.0.0",
+              "--http.vhosts=*",
+              "--ws.api=eth,net,web3,debug",
+              "--ws.addr=0.0.0.0",
+              "--ws.origins=*"
+            ],
+            "ports": [
+              {"containerPort": 8547, "name": "rpc"},
+              {"containerPort": 8548, "name": "ws"}
+            ],
+            "volumeMounts": [
+              {"name": "chain", "mountPath": "/home/user/.arbitrum"}
+            ],
+            "readinessProbe": {
+              "tcpSocket": {"port": 8547},
+              "initialDelaySeconds": 5,
+              "periodSeconds": 5
+            },
+            "resources": {
+              "requests": {
+                "cpu": "{{ .Values.chain.resources.requests.cpu }}",
+                "memory": "{{ .Values.chain.resources.requests.memory }}"
+              },
+              "limits": {
+                "cpu": "{{ .Values.chain.resources.limits.cpu }}",
+                "memory": "{{ .Values.chain.resources.limits.memory }}"
+              }
+            }
+          }
+        ],
+        "volumes": [
+          {"name": "chain", "emptyDir": {}}
+        ]
+      }
+    }

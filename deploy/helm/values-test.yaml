@@ -1,0 +1,43 @@
+# Overrides for the integration test namespace (vidao-test-*).
+# Installed by deploy/scripts/run-tests.sh with a per-run random authSecret
+# via --set test.authSecret=...
+
+namespace:
+  create: true
+  # Overridden per run via --set namespace.name=vidao-test-<suffix>
+  name: vidao-test
+
+web:
+  image:
+    tag: dev
+    pullPolicy: IfNotPresent
+  # NODE_ENV and TEST_AUTH_SECRET are injected by the web-configmap template
+  # when .Values.test.enabled is true — don't set them here.
+
+# The chainpool service owns the devnode and per-chain contract deploy.
+# Leave the in-cluster devnode + deployer Job off for test namespaces.
+devnode:
+  enabled: false
+
+deployer:
+  enabled: false
+
+# Use an ephemeral postgres — test namespaces do not share dev state.
+secrets:
+  externalSecret: false
+  # DATABASE_URL points at the in-namespace postgres StatefulSet.
+  DATABASE_URL: "postgresql://vidao:vidao@postgres:5432/vidao?schema=public"
+  PRIVY_APP_ID: "test-app-id"
+  PRIVY_APP_SECRET: "test-app-secret"
+  CRON_SECRET: "test-cron-secret"
+
+ingress:
+  enabled: false
+
+cron:
+  enabled: false
+
+test:
+  enabled: true
+  # Must be set at install time. Do not commit a default here.
+  authSecret: ""

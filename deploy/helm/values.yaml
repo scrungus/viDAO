@@ -81,3 +81,10 @@ cron:
   enabled: true
   schedule: "0 0 * * 0"
   image: curlimages/curl:8.10.0
+
+# Test-mode overrides. When enabled, the web pod runs with NODE_ENV=test and
+# a shared TEST_AUTH_SECRET that gates the server-side auth bypass header.
+# Never enable in production.
+test:
+  enabled: false
+  authSecret: ""

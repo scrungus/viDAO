@@ -7,6 +7,20 @@ on:
   workflow_dispatch:
 
 jobs:
+  stack-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shellcheck scripts
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck deploy/scripts/stack-smoke.sh deploy/scripts/run-tests.sh || true
+      - name: Syntax-check bash
+        run: |
+          bash -n deploy/scripts/stack-smoke.sh
+          bash -n deploy/scripts/run-tests.sh
+
   stack-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -80,56 +94,63 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Helm install
-        run: |
-          helm upgrade --install vidao ./deploy/helm \
-            --namespace "$NAMESPACE" --create-namespace \
-            -f ./deploy/helm/values.yaml \
-            -f ./deploy/helm/values-ci.yaml \
-            --wait --timeout 10m
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      - name: Wait for deployer Job
-        run: |
-          kubectl -n "$NAMESPACE" wait --for=condition=complete job/vidao-deployer --timeout=5m
-
-      - name: Wait for web Deployment
-        run: |
-          kubectl -n "$NAMESPACE" rollout status deployment/vidao-web --timeout=5m
-
-      - name: Seed fixture data
+      - name: Install web deps for migrations + fixtures bridge
         working-directory: apps/web
-        env:
-          DATABASE_URL: postgresql://vidao:vidao@127.0.0.1:5432/vidao?schema=public
         run: |
-          kubectl -n "$NAMESPACE" port-forward svc/postgres 5432:5432 >/tmp/pf.log 2>&1 &
-          PF_PID=$!
-          trap 'kill $PF_PID >/dev/null 2>&1 || true' EXIT
-          for i in $(seq 1 30); do
-            if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
-              break
-            fi
-            sleep 1
-          done
           npm ci
           npx prisma generate
-          npx tsx prisma/seed.ts
 
-      - name: Dump cluster state
-        if: always()
+      - name: Run CI test suite
+        env:
+          WEB_IMAGE_REPO: k3d-${{ env.REGISTRY_NAME }}.localhost:${{ env.REGISTRY_PORT }}/vidao-web
+          WEB_IMAGE_TAG: ci
+          NAMESPACE: ${{ env.NAMESPACE }}
+          RELEASE: vidao-ci
+          PYBIN: python
+        run: ./deploy/scripts/run-ci-tests.sh
+
+      - name: Dump cluster state on failure
+        if: failure()
         run: |
-          kubectl -n "$NAMESPACE" get all
-          kubectl -n "$NAMESPACE" get configmap vidao-contracts -o yaml || true
-          kubectl -n "$NAMESPACE" logs job/vidao-deployer || true
+          kubectl -n "$NAMESPACE" get all || true
           kubectl -n "$NAMESPACE" logs deployment/vidao-web --all-containers --tail=200 || true
 
-      - name: Run CI tests
-        run: |
-          if [ -x ./deploy/scripts/run-ci-tests.sh ]; then
-            ./deploy/scripts/run-ci-tests.sh
-          else
-            echo "[ci] no test suite wired up yet — stack bring-up is the assertion"
-          fi
+  contract-integration:
+    # Self-hosted homelab k3s with chainpool already running. Label-gated so
+    # it only fires when a PR carries `run-contracts` or on the nightly cron.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      contains(github.event.pull_request.labels.*.name, 'run-contracts')
+    runs-on: [self-hosted, homelab-k3s]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Uninstall
-        if: always()
-        run: helm uninstall vidao --namespace "$NAMESPACE" || true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest suite
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pytest>=8.3" "httpx>=0.27" "web3>=7.6" \
+              "eth-account>=0.13" "psycopg2-binary>=2.9" "kubernetes>=31.0" \
+              "pydantic>=2.9"
+
+      - name: Generate contract artifact cache
+        working-directory: contracts
+        run: |
+          npm ci
+          npx tsx scripts/compile-and-cache.ts
+
+      - name: Run full test suite
+        run: |
+          NS="vidao-test-$(openssl rand -hex 3)"
+          ./deploy/scripts/run-tests.sh --namespace "$NS" -m "api or contracts"

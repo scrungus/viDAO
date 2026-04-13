@@ -12,33 +12,37 @@ import {
 
 export default function EnrollPasskeyButton() {
   const router = useRouter();
-  const { ready } = usePrivy();
+  const { ready, user } = usePrivy();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const syncPasskeyToBackend = async (credentialId: string | undefined) => {
+    const accessToken = await getAccessToken();
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({
+        attestationType: "HARDWARE",
+        webauthnCredentialId: credentialId,
+      }),
+    });
+    if (!res.ok) throw new Error(`Register failed (${res.status})`);
+    router.refresh();
+  };
+
   const { linkWithPasskey } = useLinkWithPasskey({
-    onSuccess: async ({ user }: { user: User }) => {
+    onSuccess: async ({ user: updatedUser }: { user: User }) => {
       try {
-        const passkeys = (user.linkedAccounts ?? []).filter(
+        const passkeys = (updatedUser.linkedAccounts ?? []).filter(
           (account): account is PasskeyWithMetadata =>
             account.type === "passkey",
         );
-        const latestCredentialId = passkeys[passkeys.length - 1]?.credentialId;
-
-        const accessToken = await getAccessToken();
-        const res = await fetch("/api/auth/register", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          },
-          body: JSON.stringify({
-            attestationType: "HARDWARE",
-            webauthnCredentialId: latestCredentialId,
-          }),
-        });
-        if (!res.ok) throw new Error(`Register failed (${res.status})`);
-        router.refresh();
+        await syncPasskeyToBackend(
+          passkeys[passkeys.length - 1]?.credentialId,
+        );
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Account update failed",
@@ -53,13 +57,33 @@ export default function EnrollPasskeyButton() {
     },
   });
 
-  const handleEnroll = () => {
+  const handleEnroll = async () => {
     if (!ready) {
       setError("Privy not ready yet — try again in a moment");
       return;
     }
     setError(null);
     setLoading(true);
+
+    // Privy allows only one passkey per user. If one is already linked
+    // (e.g. user signed up with passkey inside the Privy modal, then clicked
+    // "Skip" in onboarding), calling linkWithPasskey would hit
+    // cannot_link_more_of_type. Just sync the existing credential instead.
+    const existing = (user?.linkedAccounts ?? []).find(
+      (account): account is PasskeyWithMetadata => account.type === "passkey",
+    );
+    if (existing) {
+      try {
+        await syncPasskeyToBackend(existing.credentialId);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Account update failed",
+        );
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     linkWithPasskey();
   };
 

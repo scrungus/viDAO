@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vidao-chainpool
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: vidao-chainpool
+spec:
+  replicas: {{ .Values.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vidao-chainpool
+  template:
+    metadata:
+      labels:
+        app: vidao-chainpool
+    spec:
+      serviceAccountName: vidao-chainpool
+      containers:
+        - name: chainpool
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: CHAINPOOL_NAMESPACE
+              value: {{ .Values.namespace | quote }}
+            - name: CHAINPOOL_MIN_IDLE
+              value: {{ .Values.pool.minIdle | quote }}
+            - name: CHAINPOOL_MAX_SIZE
+              value: {{ .Values.pool.maxSize | quote }}
+            - name: CHAINPOOL_LEASE_TTL_SECONDS
+              value: {{ .Values.pool.leaseTTLSeconds | quote }}
+            - name: CHAINPOOL_HEARTBEAT_INTERVAL_SECONDS
+              value: {{ .Values.pool.heartbeatIntervalSeconds | quote }}
+            - name: CHAINPOOL_LEASE_TTL_CLAMP_MIN
+              value: {{ .Values.pool.leaseTTLClampMin | quote }}
+            - name: CHAINPOOL_LEASE_TTL_CLAMP_MAX
+              value: {{ .Values.pool.leaseTTLClampMax | quote }}
+            - name: CHAINPOOL_CHAIN_READY_TIMEOUT_SECONDS
+              value: {{ .Values.pool.chainReadyTimeoutSeconds | quote }}
+            - name: CHAINPOOL_DEPLOYER_TIMEOUT_SECONDS
+              value: {{ .Values.pool.deployerTimeoutSeconds | quote }}
+            - name: CHAINPOOL_RECONCILER_INTERVAL_SECONDS
+              value: {{ .Values.pool.reconcilerIntervalSeconds | quote }}
+            - name: CHAINPOOL_POD_TEMPLATE_CM
+              value: "vidao-chain-pod-template"
+            - name: CHAINPOOL_POD_TEMPLATE_KEY
+              value: "pod.json"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

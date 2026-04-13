@@ -1,0 +1,6 @@
+apiVersion: v2
+name: vidao-chainpool
+description: Ephemeral Arbitrum Nitro devnode lease service for viDAO tests
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

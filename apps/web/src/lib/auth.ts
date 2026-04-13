@@ -11,11 +11,43 @@ const privy = new PrivyClient(
 type PrivyUser = Awaited<ReturnType<typeof privy.getUser>>;
 export type { PrivyUser };
 
+// Test-only auth bypass. Gated on TEST_AUTH_SECRET being non-empty at runtime
+// AND the incoming request carrying a matching `x-test-auth-secret` header.
+// The env var is only ever set by the Helm chart when `test.enabled=true`, so
+// production pods cannot activate the bypass — the gate is the secret's
+// presence, not NODE_ENV (Next.js dev mode forces NODE_ENV=development).
+// Returns undefined to mean "not bypassed, continue the real flow"; null to
+// mean "bypassed but user not found"; or a synthetic PrivyUser for a match.
+async function tryTestAuthBypass(
+  hdrs: Awaited<ReturnType<typeof import("next/headers").headers>>,
+): Promise<PrivyUser | null | undefined> {
+  const secret = process.env.TEST_AUTH_SECRET;
+  if (!secret) return undefined;
+  if (hdrs.get("x-test-auth-secret") !== secret) return undefined;
+
+  const userId = hdrs.get("x-test-auth-user-id");
+  if (!userId) return null;
+  const dbUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (!dbUser) return null;
+
+  const synthetic = {
+    id: `test:${dbUser.id}`,
+    createdAt: dbUser.createdAt,
+    linkedAccounts: [],
+    email: { address: dbUser.email },
+    wallet: dbUser.walletAddress ? { address: dbUser.walletAddress } : undefined,
+  } as unknown as PrivyUser;
+  return synthetic;
+}
+
 export async function getCurrentPrivyUser(): Promise<PrivyUser | null> {
   try {
     const cookieStore = await cookies();
     const { headers: headerStore } = await import("next/headers");
     const hdrs = await headerStore();
+
+    const testBypass = await tryTestAuthBypass(hdrs);
+    if (testBypass !== undefined) return testBypass;
 
     // Get access token from cookie or Authorization header
     const accessToken =

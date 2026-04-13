@@ -8,3 +8,8 @@ deploy/helm/charts/
 contracts/out/
 contracts/cache/
 contracts/artifacts/
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: vidao-chainpool
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: vidao-chainpool
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: vidao-chainpool
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http

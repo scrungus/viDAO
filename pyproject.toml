@@ -1,0 +1,24 @@
+[project]
+name = "vidao-tests"
+version = "0.1.0"
+description = "Integration + contract security test suite for viDAO"
+requires-python = ">=3.11"
+dependencies = [
+  "pytest>=8.3",
+  "httpx>=0.27",
+  "web3>=7.6",
+  "eth-account>=0.13",
+  "psycopg2-binary>=2.9",
+  "kubernetes>=31.0",
+  "pydantic>=2.9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "api: requires a running web pod (no chain)",
+  "contracts: requires a leased devnode + deployed contracts",
+  "slow: long-running (skippable in fast lane)",
+  "xfail_known: documented unfixed bug",
+]
+addopts = "-ra --strict-markers"

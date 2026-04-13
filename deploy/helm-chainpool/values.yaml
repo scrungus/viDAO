@@ -1,0 +1,43 @@
+namespace: vidao-chainpool
+
+image:
+  repository: vidao-chainpool
+  tag: dev
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+service:
+  type: ClusterIP
+  port: 80
+
+pool:
+  minIdle: 3
+  maxSize: 8
+  leaseTTLSeconds: 600
+  heartbeatIntervalSeconds: 120
+  leaseTTLClampMin: 60
+  leaseTTLClampMax: 1800
+  chainReadyTimeoutSeconds: 180
+  deployerTimeoutSeconds: 180
+  reconcilerIntervalSeconds: 5
+
+chain:
+  image:
+    repository: offchainlabs/nitro-node
+    tag: v3.7.1-926f1ab
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi

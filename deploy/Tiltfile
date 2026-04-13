@@ -199,3 +199,23 @@ local_resource(
     allow_parallel=False,
     resource_deps=['vidao-postgres', 'vidao-web'],
 )
+
+# --- Integration tests (manual trigger) ------------------------------------
+# Spins up a fresh vidao-test-<suffix> namespace via run-tests.sh, installs
+# the chart with values-test.yaml, runs pytest, tears down. Does NOT share
+# state with vidao-dev. Safe to click while dev is running.
+local_resource(
+    'vidao-tests',
+    cmd='bash ./scripts/run-tests.sh -m api',
+    auto_init=False,
+    trigger_mode=TRIGGER_MODE_MANUAL,
+    allow_parallel=False,
+)
+
+local_resource(
+    'vidao-tests-contracts',
+    cmd='bash ./scripts/run-tests.sh -m "api or contracts"',
+    auto_init=False,
+    trigger_mode=TRIGGER_MODE_MANUAL,
+    allow_parallel=False,
+)
